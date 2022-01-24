@@ -82,6 +82,7 @@ class BridgeInterceptor(private val cookieJar: CookieJar) : Interceptor {
 
     val networkResponse = chain.proceed(requestBuilder.build())
 
+    // 保存cookies
     cookieJar.receiveHeaders(userRequest.url, networkResponse.headers)
 
     val responseBuilder = networkResponse.newBuilder()

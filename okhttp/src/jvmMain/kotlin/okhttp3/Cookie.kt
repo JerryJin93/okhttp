@@ -382,14 +382,21 @@ class Cookie private constructor(
         parse(System.currentTimeMillis(), url, setCookie)
 
     internal fun parse(currentTimeMillis: Long, url: HttpUrl, setCookie: String): Cookie? {
+      // cookie是以键值对的形式在字符串中拼接表示，每个键值对以";"结束
+      // 拿到结束位置索引
       val cookiePairEnd = setCookie.delimiterOffset(';')
 
+      // 缩短搜索范围，搜索"="
       val pairEqualsSign = setCookie.delimiterOffset('=', endIndex = cookiePairEnd)
+      // 如果"="的位置在文本的末尾，则为无效Cookie
       if (pairEqualsSign == cookiePairEnd) return null
 
+      // 拿到cookie名称
       val cookieName = setCookie.trimSubstring(endIndex = pairEqualsSign)
+      // 如果名称为null或者包含非ASCII码则为无效的Cookie，返回null
       if (cookieName.isEmpty() || cookieName.indexOfControlOrNonAscii() != -1) return null
 
+      // 拿到cookie的value
       val cookieValue = setCookie.trimSubstring(pairEqualsSign + 1, cookiePairEnd)
       if (cookieValue.indexOfControlOrNonAscii() != -1) return null
 
@@ -608,9 +615,11 @@ class Cookie private constructor(
     /** Returns all of the cookies from a set of HTTP response headers. */
     @JvmStatic
     fun parseAll(url: HttpUrl, headers: Headers): List<Cookie> {
+      // 在HTTP响应头中获取所有"Set-Cookie"后的字段
       val cookieStrings = headers.values("Set-Cookie")
       var cookies: MutableList<Cookie>? = null
 
+      // 迭代解析Cookie
       for (i in 0 until cookieStrings.size) {
         val cookie = parse(url, cookieStrings[i]) ?: continue
         if (cookies == null) cookies = mutableListOf()

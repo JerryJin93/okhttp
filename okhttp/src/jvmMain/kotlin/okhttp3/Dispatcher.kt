@@ -118,6 +118,7 @@ class Dispatcher() {
       // Mutate the AsyncCall so that it shares the AtomicInteger of an existing running call to
       // the same host.
       if (!call.call.forWebSocket) {
+        // 复用相同host的call
         val existingCall = findExistingCallWithHost(call.host)
         if (existingCall != null) call.reuseCallsPerHostFrom(existingCall)
       }
