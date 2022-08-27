@@ -19,6 +19,7 @@ import java.io.IOException
 import java.io.InterruptedIOException
 import java.lang.ref.WeakReference
 import java.net.Socket
+import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.TimeUnit.MILLISECONDS
@@ -63,7 +64,7 @@ class RealCall(
   /** The application's original request unadulterated by redirects or auth headers. */
   val originalRequest: Request,
   val forWebSocket: Boolean
-) : Call {
+) : Call, Cloneable {
   private val connectionPool: RealConnectionPool = client.connectionPool.delegate
 
   internal val eventListener: EventListener = client.eventListenerFactory.create(this)
@@ -115,7 +116,7 @@ class RealCall(
 
   @Volatile private var canceled = false
   @Volatile private var exchange: Exchange? = null
-  @Volatile var connectionToCancel: RealConnection? = null
+  internal val plansToCancel = CopyOnWriteArrayList<RoutePlanner.Plan>()
 
   override fun timeout(): Timeout = timeout
 
@@ -138,7 +139,9 @@ class RealCall(
 
     canceled = true
     exchange?.cancel()
-    connectionToCancel?.cancel()
+    for (plan in plansToCancel) {
+      plan.cancel()
+    }
 
     eventListener.canceled(this)
   }
@@ -228,9 +231,13 @@ class RealCall(
    *
    * Note that an exchange will not be needed if the request is satisfied by the cache.
    *
-   * @param newExchangeFinder true if this is not a retry and new routing can be performed.
+   * @param newRoutePlanner true if this is not a retry and new routing can be performed.
    */
-  fun enterNetworkInterceptorExchange(request: Request, newExchangeFinder: Boolean) {
+  fun enterNetworkInterceptorExchange(
+    request: Request,
+    newRoutePlanner: Boolean,
+    chain: RealInterceptorChain,
+  ) {
     check(interceptorScopedExchange == null)
 
     synchronized(this) {
@@ -241,14 +248,17 @@ class RealCall(
       check(!requestBodyOpen)
     }
 
-    if (newExchangeFinder) {
-      this.exchangeFinder = ExchangeFinder(
-        client.taskRunner,
-        connectionPool,
+    if (newRoutePlanner) {
+      val routePlanner = RealRoutePlanner(
+        client,
         createAddress(request.url),
         this,
-        eventListener
+        chain,
       )
+      this.exchangeFinder = when {
+        client.fastFallback -> FastFallbackExchangeFinder(routePlanner, client.taskRunner)
+        else -> SequentialExchangeFinder(routePlanner)
+      }
     }
   }
 
@@ -261,7 +271,8 @@ class RealCall(
     }
 
     val exchangeFinder = this.exchangeFinder!!
-    val codec = exchangeFinder.find(client, chain)
+    val connection = exchangeFinder.find()
+    val codec = connection.newCodec(client, chain)
     val result = Exchange(this, eventListener, exchangeFinder, codec)
     this.interceptorScopedExchange = result
     this.exchange = result
@@ -462,7 +473,10 @@ class RealCall(
     )
   }
 
-  fun retryAfterFailure(): Boolean = exchangeFinder!!.retryAfterFailure()
+  fun retryAfterFailure(): Boolean {
+    return exchange?.hasFailure == true &&
+      exchangeFinder!!.routePlanner.hasNext(exchange?.connection)
+  }
 
   /**
    * Returns a string that describes this call. Doesn't include a full URL as that might contain
@@ -507,15 +521,19 @@ class RealCall(
         executorService.execute(this)
         success = true
       } catch (e: RejectedExecutionException) {
-        val ioException = InterruptedIOException("executor rejected")
-        ioException.initCause(e)
-        noMoreExchanges(ioException)
-        responseCallback.onFailure(this@RealCall, ioException)
+        failRejected(e)
       } finally {
         if (!success) {
           client.dispatcher.finished(this) // This call is no longer running!
         }
       }
+    }
+
+    internal fun failRejected(e: RejectedExecutionException? = null) {
+      val ioException = InterruptedIOException("executor rejected")
+      ioException.initCause(e)
+      noMoreExchanges(ioException)
+      responseCallback.onFailure(this@RealCall, ioException)
     }
 
     override fun run() {

@@ -69,7 +69,7 @@ class CallHandshakeTest {
         handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager)
       .hostnameVerifier(RecordingHostnameVerifier())
       .build()
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false)
+    server.useHttps(handshakeCertificates.sslSocketFactory())
 
     defaultEnabledCipherSuites =
       handshakeCertificates.sslSocketFactory().defaultCipherSuites.toList()
@@ -274,7 +274,7 @@ class CallHandshakeTest {
   }
 
   private fun makeRequest(client: OkHttpClient): Handshake {
-    val call = client.newCall(Request.Builder().url(server.url("/")).build())
+    val call = client.newCall(Request(server.url("/")))
     return call.execute().use { it.handshake!! }
   }
 }

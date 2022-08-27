@@ -37,6 +37,7 @@ import java.util.TimeZone;
 import mockwebserver3.MockResponse;
 import mockwebserver3.MockWebServer;
 import mockwebserver3.RecordedRequest;
+import mockwebserver3.junit5.internal.MockWebServerInstance;
 import okhttp3.internal.Internal;
 import okhttp3.internal.platform.Platform;
 import okhttp3.testing.PlatformRule;
@@ -78,7 +79,11 @@ public final class CacheTest {
   private Cache cache;
   private final CookieManager cookieManager = new CookieManager();
 
-  @BeforeEach public void setUp(MockWebServer server, MockWebServer server2) throws Exception {
+  @BeforeEach
+  public void setUp(
+    @MockWebServerInstance(name = "1") MockWebServer server,
+    @MockWebServerInstance(name = "2") MockWebServer server2
+  ) throws Exception {
     this.server = server;
     this.server2 = server2;
 
@@ -264,7 +269,7 @@ public final class CacheTest {
   }
 
   @Test public void secureResponseCaching() throws IOException {
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false);
+    server.useHttps(handshakeCertificates.sslSocketFactory());
     server.enqueue(new MockResponse()
         .addHeader("Last-Modified: " + formatDate(-1, TimeUnit.HOURS))
         .addHeader("Expires: " + formatDate(1, TimeUnit.HOURS))
@@ -362,7 +367,7 @@ public final class CacheTest {
   }
 
   @Test public void secureResponseCachingAndRedirects() throws IOException {
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false);
+    server.useHttps(handshakeCertificates.sslSocketFactory());
     server.enqueue(new MockResponse()
         .addHeader("Last-Modified: " + formatDate(-1, TimeUnit.HOURS))
         .addHeader("Expires: " + formatDate(1, TimeUnit.HOURS))
@@ -405,7 +410,7 @@ public final class CacheTest {
    * https://github.com/square/okhttp/issues/214
    */
   @Test public void secureResponseCachingAndProtocolRedirects() throws IOException {
-    server2.useHttps(handshakeCertificates.sslSocketFactory(), false);
+    server2.useHttps(handshakeCertificates.sslSocketFactory());
     server2.enqueue(new MockResponse()
         .addHeader("Last-Modified: " + formatDate(-1, TimeUnit.HOURS))
         .addHeader("Expires: " + formatDate(1, TimeUnit.HOURS))
@@ -1780,7 +1785,7 @@ public final class CacheTest {
   }
 
   @Test public void varyAndHttps() throws Exception {
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false);
+    server.useHttps(handshakeCertificates.sslSocketFactory());
     server.enqueue(new MockResponse()
         .addHeader("Cache-Control: max-age=60")
         .addHeader("Vary: Accept-Language")

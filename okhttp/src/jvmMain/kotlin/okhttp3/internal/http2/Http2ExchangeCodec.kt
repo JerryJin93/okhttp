@@ -17,7 +17,6 @@ package okhttp3.internal.http2
 
 import java.io.IOException
 import java.net.ProtocolException
-import java.util.ArrayList
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import okhttp3.Headers
@@ -25,13 +24,13 @@ import okhttp3.OkHttpClient
 import okhttp3.Protocol
 import okhttp3.Request
 import okhttp3.Response
-import okhttp3.internal.connection.RealConnection
 import okhttp3.internal.headersContentLength
 import okhttp3.internal.http.ExchangeCodec
+import okhttp3.internal.http.ExchangeCodec.Carrier
+import okhttp3.internal.http.HTTP_CONTINUE
 import okhttp3.internal.http.RealInterceptorChain
 import okhttp3.internal.http.RequestLine
 import okhttp3.internal.http.StatusLine
-import okhttp3.internal.http.StatusLine.Companion.HTTP_CONTINUE
 import okhttp3.internal.http.promisesBody
 import okhttp3.internal.http2.Header.Companion.RESPONSE_STATUS_UTF8
 import okhttp3.internal.http2.Header.Companion.TARGET_AUTHORITY
@@ -49,7 +48,7 @@ import okio.Source
 /** Encode requests and responses using HTTP/2 frames. */
 class Http2ExchangeCodec(
   client: OkHttpClient,
-  override val connection: RealConnection,
+  override val carrier: Carrier,
   private val chain: RealInterceptorChain,
   private val http2Connection: Http2Connection
 ) : ExchangeCodec {
@@ -94,7 +93,7 @@ class Http2ExchangeCodec(
 
   override fun readResponseHeaders(expectContinue: Boolean): Response.Builder? {
     val stream = stream ?: throw IOException("stream wasn't created")
-    val headers = stream.takeHeaders()
+    val headers = stream.takeHeaders(callerIsIdle = expectContinue)
     val responseBuilder = readHttp2HeadersList(headers, protocol)
     return if (expectContinue && responseBuilder.code == HTTP_CONTINUE) {
       null
@@ -199,6 +198,7 @@ class Http2ExchangeCodec(
           .code(statusLine.code)
           .message(statusLine.message)
           .headers(headersBuilder.build())
+          .trailers { error("trailers not available") }
     }
   }
 }

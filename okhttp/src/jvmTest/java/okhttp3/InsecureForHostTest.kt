@@ -23,19 +23,25 @@ import okhttp3.tls.HandshakeCertificates
 import okhttp3.tls.HeldCertificate
 import okhttp3.tls.internal.TlsUtil.localhost
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.api.fail
 
-class InsecureForHostTest(
-  val server: MockWebServer
-) {
+class InsecureForHostTest {
   @RegisterExtension @JvmField val platform = PlatformRule()
   @RegisterExtension @JvmField val clientTestRule = OkHttpClientTestRule()
 
+  private lateinit var server: MockWebServer
+
+  @BeforeEach
+  fun setup(server: MockWebServer) {
+    this.server = server
+  }
+
   @Test fun `untrusted host in insecureHosts connects successfully`() {
     val serverCertificates = localhost()
-    server.useHttps(serverCertificates.sslSocketFactory(), false)
+    server.useHttps(serverCertificates.sslSocketFactory())
     server.enqueue(MockResponse())
 
     val clientCertificates = HandshakeCertificates.Builder()
@@ -47,9 +53,7 @@ class InsecureForHostTest(
         .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager)
         .build()
 
-    val call = client.newCall(Request.Builder()
-        .url(server.url("/"))
-        .build())
+    val call = client.newCall(Request(server.url("/")))
     val response = call.execute()
     assertThat(response.code).isEqualTo(200)
     assertThat(response.handshake!!.cipherSuite).isNotNull()
@@ -67,7 +71,7 @@ class InsecureForHostTest(
     val serverCertificates = HandshakeCertificates.Builder()
         .heldCertificate(heldCertificate)
         .build()
-    server.useHttps(serverCertificates.sslSocketFactory(), false)
+    server.useHttps(serverCertificates.sslSocketFactory())
     server.enqueue(MockResponse())
 
     val clientCertificates = HandshakeCertificates.Builder()
@@ -79,9 +83,7 @@ class InsecureForHostTest(
         .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager)
         .build()
 
-    val call = client.newCall(Request.Builder()
-        .url(server.url("/"))
-        .build())
+    val call = client.newCall(Request(server.url("/")))
     try {
       call.execute()
       fail("")
@@ -91,7 +93,7 @@ class InsecureForHostTest(
 
   @Test fun `untrusted host not in insecureHosts fails with SSLException`() {
     val serverCertificates = localhost()
-    server.useHttps(serverCertificates.sslSocketFactory(), false)
+    server.useHttps(serverCertificates.sslSocketFactory())
     server.enqueue(MockResponse())
 
     val clientCertificates = HandshakeCertificates.Builder()
@@ -103,9 +105,7 @@ class InsecureForHostTest(
         .sslSocketFactory(clientCertificates.sslSocketFactory(), clientCertificates.trustManager)
         .build()
 
-    val call = client.newCall(Request.Builder()
-        .url(server.url("/"))
-        .build())
+    val call = client.newCall(Request(server.url("/")))
     try {
       call.execute()
       fail("")

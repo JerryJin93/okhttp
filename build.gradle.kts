@@ -1,6 +1,9 @@
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import com.vanniktech.maven.publish.SonatypeHost
+import groovy.util.Node
+import groovy.util.NodeList
 import java.net.URL
+import kotlinx.validation.ApiValidationExtension
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.dokka.gradle.DokkaTask
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
@@ -8,18 +11,18 @@ import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 
 buildscript {
   dependencies {
-    classpath(Dependencies.kotlinPlugin)
-    classpath(Dependencies.dokkaPlugin)
-    classpath(Dependencies.androidPlugin)
-    classpath(Dependencies.androidJunit5Plugin)
-    classpath(Dependencies.graalPlugin)
-    classpath(Dependencies.bndPlugin)
-    classpath(Dependencies.shadowPlugin)
-    classpath(Dependencies.japicmpPlugin)
-    classpath(Dependencies.animalsnifferPlugin)
-    classpath(Dependencies.errorpronePlugin)
-    classpath(Dependencies.spotlessPlugin)
-    classpath(Dependencies.vanniktechPublishPlugin)
+    classpath(libs.gradlePlugin.dokka)
+    classpath(libs.gradlePlugin.kotlin)
+    classpath(libs.gradlePlugin.androidJunit5)
+    classpath(libs.gradlePlugin.android)
+    classpath(libs.gradlePlugin.graal)
+    classpath(libs.gradlePlugin.bnd)
+    classpath(libs.gradlePlugin.shadow)
+    classpath(libs.gradlePlugin.animalsniffer)
+    classpath(libs.gradlePlugin.errorprone)
+    classpath(libs.gradlePlugin.spotless)
+    classpath(libs.gradlePlugin.mavenPublish)
+    classpath(libs.gradlePlugin.binaryCompatibilityValidator)
   }
 
   repositories {
@@ -28,8 +31,6 @@ buildscript {
     google()
   }
 }
-
-apply(plugin = "com.vanniktech.maven.publish.base")
 
 allprojects {
   group = "com.squareup.okhttp3"
@@ -63,14 +64,14 @@ allprojects {
 /** Configure building for Java+Kotlin projects. */
 subprojects {
   val project = this@subprojects
-  if (project.name == "android-test") return@subprojects
   if (project.name == "okhttp-bom") return@subprojects
+
+  if (project.name == "okhttp-android") return@subprojects
+  if (project.name == "android-test") return@subprojects
   if (project.name == "regression-test") return@subprojects
 
   apply(plugin = "checkstyle")
-  apply(plugin = "com.diffplug.spotless")
   apply(plugin = "ru.vyarus.animalsniffer")
-  apply(plugin = "org.jetbrains.dokka")
   apply(plugin = "biz.aQute.bnd.builder")
 
   tasks.withType<JavaCompile> {
@@ -80,7 +81,6 @@ subprojects {
   configure<JavaPluginExtension> {
     toolchain {
       languageVersion.set(JavaLanguageVersion.of(11))
-      vendor.set(JvmVendorSpec.ADOPTOPENJDK)
     }
   }
 
@@ -90,17 +90,15 @@ subprojects {
 
   val checkstyleConfig: Configuration by configurations.creating
   dependencies {
-    checkstyleConfig(Dependencies.checkStyle) {
+    checkstyleConfig(rootProject.libs.checkStyle) {
       isTransitive = false
     }
   }
 
-  afterEvaluate {
-    configure<CheckstyleExtension> {
-      config = resources.text.fromArchiveEntry(checkstyleConfig, "google_checks.xml")
-      toolVersion = Versions.checkStyle
-      sourceSets = listOf(project.sourceSets["main"])
-    }
+  configure<CheckstyleExtension> {
+    config = resources.text.fromArchiveEntry(checkstyleConfig, "google_checks.xml")
+    toolVersion = rootProject.libs.versions.checkStyle.get()
+    sourceSets = listOf(project.sourceSets["main"])
   }
 
   // Animal Sniffer confirms we generally don't use APIs not on Java 8.
@@ -108,18 +106,19 @@ subprojects {
     annotation = "okhttp3.internal.SuppressSignatureCheck"
     sourceSets = listOf(project.sourceSets["main"])
   }
+
   val signature: Configuration by configurations.getting
   dependencies {
-    signature(Dependencies.signatureAndroid21)
-    signature(Dependencies.signatureJava18)
+    signature(rootProject.libs.signature.android.apilevel21)
+    signature(rootProject.libs.codehaus.signature.java18)
   }
 
   tasks.withType<KotlinCompile> {
     kotlinOptions {
       jvmTarget = JavaVersion.VERSION_1_8.toString()
       freeCompilerArgs = listOf(
-        "-Xjvm-default=compatibility",
-        "-Xopt-in=kotlin.RequiresOptIn"
+        "-Xjvm-default=all",
+        "-opt-in=kotlin.RequiresOptIn"
       )
     }
   }
@@ -129,18 +128,20 @@ subprojects {
 
   val testRuntimeOnly: Configuration by configurations.getting
   dependencies {
-    testRuntimeOnly(Dependencies.junit5JupiterEngine)
-    testRuntimeOnly(Dependencies.junit5VintageEngine)
+    testRuntimeOnly(rootProject.libs.junit.jupiter.engine)
+    testRuntimeOnly(rootProject.libs.junit.vintage.engine)
   }
 
   tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs = jvmArgs!! + listOf("-Dokhttp.platform=$platform")
+    jvmArgs = jvmArgs!! + listOf(
+      "-Dokhttp.platform=$platform",
+      "-XX:+HeapDumpOnOutOfMemoryError"
+    )
 
     val javaToolchains = project.extensions.getByType<JavaToolchainService>()
     javaLauncher.set(javaToolchains.launcherFor {
       languageVersion.set(JavaLanguageVersion.of(testJavaVersion))
-      vendor.set(JvmVendorSpec.ADOPTOPENJDK)
     })
 
     maxParallelForks = Runtime.getRuntime().availableProcessors() * 2
@@ -165,11 +166,11 @@ subprojects {
     }
   } else if (platform == "conscrypt") {
     dependencies {
-      testRuntimeOnly(Dependencies.conscrypt)
+      testRuntimeOnly(rootProject.libs.conscrypt.openjdk)
     }
   } else if (platform == "openjsse") {
     dependencies {
-      testRuntimeOnly(Dependencies.openjsse)
+      testRuntimeOnly(rootProject.libs.openjsse)
     }
   }
 
@@ -202,9 +203,13 @@ subprojects {
         packageListUrl.set(URL("https://square.github.io/okio/2.x/okio/package-list"))
       }
     }
+    if (name == "dokkaGfm") {
+      outputDirectory.set(file("${rootDir}/docs/4.x"))
+    }
   }
 
   plugins.withId("com.vanniktech.maven.publish.base") {
+    val publishingExtension = extensions.getByType(PublishingExtension::class.java)
     configure<MavenPublishBaseExtension> {
       publishToMavenCentral(SonatypeHost.S01)
       signAllPublications()
@@ -230,6 +235,43 @@ subprojects {
           }
         }
       }
+
+      // Configure the kotlinMultiplatform artifact to depend on the JVM artifact in pom.xml only.
+      // This hack allows Maven users to continue using our original OkHttp artifact names (like
+      // com.squareup.okhttp3:okhttp:5.x.y) even though we changed that artifact from JVM-only
+      // to Kotlin Multiplatform. Note that module.json doesn't need this hack.
+      val mavenPublications = publishingExtension.publications.withType<MavenPublication>()
+      mavenPublications.configureEach {
+        if (name != "jvm") return@configureEach
+        val jvmPublication = this
+        val kmpPublication = mavenPublications.getByName("kotlinMultiplatform")
+        kmpPublication.pom.withXml {
+          val root = asNode()
+          val dependencies = (root["dependencies"] as NodeList).firstOrNull() as Node?
+            ?: root.appendNode("dependencies")
+          for (child in dependencies.children().toList()) {
+            dependencies.remove(child as Node)
+          }
+          dependencies.appendNode("dependency").apply {
+            appendNode("groupId", jvmPublication.groupId)
+            appendNode("artifactId", jvmPublication.artifactId)
+            appendNode("version", jvmPublication.version)
+            appendNode("scope", "compile")
+          }
+        }
+      }
+    }
+  }
+
+  plugins.withId("binary-compatibility-validator") {
+    configure<ApiValidationExtension> {
+      ignoredPackages += "okhttp3.logging.internal"
+      ignoredPackages += "mockwebserver3.internal"
+      ignoredPackages += "okhttp3.internal"
+      ignoredPackages += "mockwebserver3.junit5.internal"
+      ignoredPackages += "okhttp3.brotli.internal"
+      ignoredPackages += "okhttp3.sse.internal"
+      ignoredPackages += "okhttp3.tls.internal"
     }
   }
 }

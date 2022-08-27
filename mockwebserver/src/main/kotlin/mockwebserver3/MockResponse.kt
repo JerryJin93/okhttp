@@ -16,18 +16,38 @@
 package mockwebserver3
 
 import java.util.concurrent.TimeUnit
+import mockwebserver3.internal.duplex.DuplexResponseBody
 import okhttp3.Headers
 import okhttp3.WebSocketListener
 import okhttp3.internal.addHeaderLenient
 import okhttp3.internal.http2.Settings
-import mockwebserver3.internal.duplex.DuplexResponseBody
 import okio.Buffer
 
 /** A scripted response to be replayed by the mock web server. */
 class MockResponse : Cloneable {
+  var inTunnel = false
+    private set
+
+  var informationalResponses: List<MockResponse> = listOf()
+    private set
+
   /** Returns the HTTP response line, such as "HTTP/1.1 200 OK". */
   @set:JvmName("status")
   var status: String = ""
+
+  val code: Int
+    get() {
+      val statusParts = status.split(' ', limit = 3)
+      require(statusParts.size >= 2) { "Unexpected status: $status" }
+      return statusParts[1].toInt()
+    }
+
+  val message: String
+    get() {
+      val statusParts = status.split(' ', limit = 3)
+      require(statusParts.size >= 2) { "Unexpected status: $status" }
+      return statusParts[2]
+    }
 
   private var headersBuilder = Headers.Builder()
   private var trailersBuilder = Headers.Builder()
@@ -343,6 +363,34 @@ class MockResponse : Cloneable {
     setHeader("Upgrade", "websocket")
     body = null
     webSocketListener = listener
+  }
+
+  /**
+   * Configures this response to be served as a response to an HTTP CONNECT request, either for
+   * doing HTTPS through an HTTP proxy, or HTTP/2 prior knowledge through an HTTP proxy.
+   *
+   * When a new connection is received, all in-tunnel responses are served before the connection is
+   * upgraded to HTTPS or HTTP/2.
+   */
+  fun inTunnel() = apply {
+    removeHeader("Content-Length")
+    inTunnel = true
+  }
+
+  /**
+   * Adds an HTTP 1xx response to precede this response. Note that this response's
+   * [headers delay][setHeadersDelay] applies after this response is transmitted. Set a
+   * headers delay on that response to delay its transmission.
+   */
+  fun addInformationalResponse(response: MockResponse) = apply {
+    informationalResponses += response
+  }
+
+  fun add100Continue() = apply {
+    addInformationalResponse(
+      MockResponse()
+        .setResponseCode(100)
+    )
   }
 
   override fun toString(): String = status

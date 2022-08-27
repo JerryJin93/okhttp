@@ -42,6 +42,7 @@ import okhttp3.TestLogHandler;
 import okhttp3.TestUtil;
 import okhttp3.WebSocket;
 import okhttp3.WebSocketListener;
+import okhttp3.internal.UnreadableResponseBody;
 import okhttp3.internal.concurrent.TaskRunner;
 import okhttp3.testing.Flaky;
 import okhttp3.testing.PlatformRule;
@@ -54,7 +55,6 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-
 import static java.util.Arrays.asList;
 import static okhttp3.TestUtil.repeat;
 import static okhttp3.tls.internal.TlsUtil.localhost;
@@ -391,6 +391,7 @@ public final class WebSocketHttpTest {
         "Request header not permitted: 'Sec-WebSocket-Extensions'");
   }
 
+  @SuppressWarnings("KotlinInternalInJava")
   @Test public void webSocketAndApplicationInterceptors() {
     final AtomicInteger interceptedCount = new AtomicInteger();
 
@@ -399,7 +400,7 @@ public final class WebSocketHttpTest {
           assertThat(chain.request().body()).isNull();
           Response response = chain.proceed(chain.request());
           assertThat(response.header("Connection")).isEqualTo("Upgrade");
-          assertThat(response.body().source().exhausted()).isTrue();
+          assertThat(response.body()).isInstanceOf(UnreadableResponseBody.class);
           interceptedCount.incrementAndGet();
           return response;
         })
@@ -520,7 +521,7 @@ public final class WebSocketHttpTest {
   }
 
   @Test public void wssScheme() {
-    webServer.useHttps(handshakeCertificates.sslSocketFactory(), false);
+    webServer.useHttps(handshakeCertificates.sslSocketFactory());
     client = client.newBuilder()
         .sslSocketFactory(
             handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager())
@@ -531,7 +532,7 @@ public final class WebSocketHttpTest {
   }
 
   @Test public void httpsScheme() {
-    webServer.useHttps(handshakeCertificates.sslSocketFactory(), false);
+    webServer.useHttps(handshakeCertificates.sslSocketFactory());
     client = client.newBuilder()
         .sslSocketFactory(
             handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager())

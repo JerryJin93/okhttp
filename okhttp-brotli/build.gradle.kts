@@ -5,6 +5,7 @@ plugins {
   kotlin("jvm")
   id("org.jetbrains.dokka")
   id("com.vanniktech.maven.publish.base")
+  id("binary-compatibility-validator")
 }
 
 project.applyOsgi(
@@ -14,14 +15,14 @@ project.applyOsgi(
 )
 
 dependencies {
-  api(project(":okhttp"))
-  api(Dependencies.brotli)
-  compileOnly(Dependencies.jsr305)
+  api(projects.okhttp)
+  api(libs.brotli.dec)
+  compileOnly(libs.findbugs.jsr305)
 
-  testImplementation(project(":okhttp-testing-support"))
-  testImplementation(Dependencies.conscrypt)
-  testImplementation(Dependencies.junit)
-  testImplementation(Dependencies.assertj)
+  testImplementation(projects.okhttpTestingSupport)
+  testImplementation(libs.conscrypt.openjdk)
+  testImplementation(libs.junit)
+  testImplementation(libs.assertj.core)
 }
 
 mavenPublishing {

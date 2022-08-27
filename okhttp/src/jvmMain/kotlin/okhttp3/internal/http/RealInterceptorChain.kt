@@ -93,7 +93,7 @@ class RealInterceptorChain(
     calls++
 
     if (exchange != null) {
-      check(exchange.finder.sameHostAndPort(request.url)) {
+      check(exchange.finder.routePlanner.sameHostAndPort(request.url)) {
         "network interceptor ${interceptors[index - 1]} must retain the same host and port"
       }
       check(calls == 1) {
@@ -114,8 +114,6 @@ class RealInterceptorChain(
         "network interceptor $interceptor must call proceed() exactly once"
       }
     }
-
-    check(response.body != null) { "interceptor $interceptor returned a response with no body" }
 
     return response
   }

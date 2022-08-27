@@ -52,12 +52,6 @@ enum class SocketPolicy {
   DISCONNECT_AT_END,
 
   /**
-   * Wrap the socket with SSL at the completion of this request/response pair. Used for CONNECT
-   * messages to tunnel SSL over an HTTP proxy.
-   */
-  UPGRADE_TO_SSL_AT_END,
-
-  /**
    * Request immediate close of connection without even reading the request. Use to simulate buggy
    * SSL servers closing connections in response to unrecognized TLS extensions.
    */
@@ -68,6 +62,12 @@ enum class SocketPolicy {
    * simulate late connection pool failures.
    */
   DISCONNECT_AFTER_REQUEST,
+
+  /**
+   * Half close connection (InputStream for client) after reading the request but before
+   * writing the response. Use this to simulate late connection pool failures.
+   */
+  HALF_CLOSE_AFTER_REQUEST,
 
   /** Close connection after reading half of the request body (if present). */
   DISCONNECT_DURING_REQUEST_BODY,
@@ -115,16 +115,4 @@ enum class SocketPolicy {
    * Fail HTTP/2 requests without processing them by sending an [MockResponse.getHttp2ErrorCode].
    */
   RESET_STREAM_AT_START,
-
-  /**
-   * Transmit a `HTTP/1.1 100 Continue` response before reading the HTTP request body.
-   * Typically this response is sent when a client makes a request with the header `Expect: 100-continue`.
-   */
-  EXPECT_CONTINUE,
-
-  /**
-   * Transmit a `HTTP/1.1 100 Continue` response before reading the HTTP request body even
-   * if the client does not send the header `Expect: 100-continue` in its request.
-   */
-  CONTINUE_ALWAYS
 }

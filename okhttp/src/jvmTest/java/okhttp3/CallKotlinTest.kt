@@ -22,9 +22,11 @@ import java.time.Duration
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
 import mockwebserver3.SocketPolicy
+import okhttp3.Headers.Companion.headersOf
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.TestUtil.assertSuppressed
+import okhttp3.internal.DoubleInetAddressDns
 import okhttp3.internal.connection.RealConnection
 import okhttp3.internal.connection.RealConnection.Companion.IDLE_CONNECTION_HEALTHY_NS
 import okhttp3.internal.http.RecordingProxySelector
@@ -41,9 +43,7 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.junit.jupiter.api.fail
 
 @Timeout(30)
-class CallKotlinTest(
-  val server: MockWebServer
-) {
+class CallKotlinTest {
   @JvmField @RegisterExtension val platform = PlatformRule()
   @JvmField @RegisterExtension val clientTestRule = OkHttpClientTestRule().apply {
     recordFrames = true
@@ -52,9 +52,11 @@ class CallKotlinTest(
 
   private var client = clientTestRule.newClient()
   private val handshakeCertificates = localhost()
+  private lateinit var server: MockWebServer
 
   @BeforeEach
-  fun setup() {
+  fun setUp(server: MockWebServer) {
+    this.server = server
     platform.assumeNotBouncyCastle()
   }
 
@@ -63,9 +65,7 @@ class CallKotlinTest(
     server.enqueue(MockResponse().setBody("abc"))
     server.enqueue(MockResponse().setBody("def"))
 
-    val request = Request.Builder()
-        .url(server.url("/"))
-        .build()
+    val request = Request(server.url("/"))
 
     val call = client.newCall(request)
     val response1 = call.execute()
@@ -73,8 +73,8 @@ class CallKotlinTest(
     val cloned = call.clone()
     val response2 = cloned.execute()
 
-    assertThat("abc").isEqualTo(response1.body!!.string())
-    assertThat("def").isEqualTo(response2.body!!.string())
+    assertThat("abc").isEqualTo(response1.body.string())
+    assertThat("def").isEqualTo(response2.body.string())
   }
 
   @Test
@@ -100,7 +100,7 @@ class CallKotlinTest(
         .sslSocketFactory(
             handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager)
         .build()
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false)
+    server.useHttps(handshakeCertificates.sslSocketFactory())
   }
 
   @Test
@@ -202,33 +202,31 @@ class CallKotlinTest(
         .setSocketPolicy(SocketPolicy.SHUTDOWN_OUTPUT_AT_END))
     server.enqueue(MockResponse().setBody("b"))
 
-    val requestA = Request.Builder()
-        .url(server.url("/"))
-        .build()
+    val requestA = Request(server.url("/"))
     val responseA = client.newCall(requestA).execute()
 
-    assertThat(responseA.body!!.string()).isEqualTo("a")
+    assertThat(responseA.body.string()).isEqualTo("a")
     assertThat(server.takeRequest().sequenceNumber).isEqualTo(0)
 
     // Give the socket a chance to become stale.
     connection!!.idleAtNs -= IDLE_CONNECTION_HEALTHY_NS
     Thread.sleep(250)
 
-    val requestB = Request.Builder()
-        .url(server.url("/"))
-        .post("b".toRequestBody("text/plain".toMediaType()))
-        .build()
+    val requestB = Request(
+      url = server.url("/"),
+      body = "b".toRequestBody("text/plain".toMediaType()),
+    )
     val responseB = client.newCall(requestB).execute()
-    assertThat(responseB.body!!.string()).isEqualTo("b")
+    assertThat(responseB.body.string()).isEqualTo("b")
     assertThat(server.takeRequest().sequenceNumber).isEqualTo(0)
   }
 
-  @Test fun exceptionsAreReturnedAsSuppressed() {
+  /** Confirm suppressed exceptions that occur while connecting are returned. */
+  @Test fun connectExceptionsAreReturnedAsSuppressed() {
     val proxySelector = RecordingProxySelector()
-    proxySelector.proxies.add(Proxy(Proxy.Type.HTTP, TestUtil.UNREACHABLE_ADDRESS))
+    proxySelector.proxies.add(Proxy(Proxy.Type.HTTP, TestUtil.UNREACHABLE_ADDRESS_IPV4))
     proxySelector.proxies.add(Proxy.NO_PROXY)
-
-    server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+    server.shutdown()
 
     client = client.newBuilder()
         .proxySelector(proxySelector)
@@ -236,7 +234,7 @@ class CallKotlinTest(
         .connectTimeout(Duration.ofMillis(100))
         .build()
 
-    val request = Request.Builder().url(server.url("/")).build()
+    val request = Request(server.url("/"))
     try {
       client.newCall(request).execute()
       fail("")
@@ -247,5 +245,44 @@ class CallKotlinTest(
         assertThat(suppressed).isNotSameAs(expected)
       }
     }
+  }
+
+  /** Confirm suppressed exceptions that occur after connecting are returned. */
+  @Test fun httpExceptionsAreReturnedAsSuppressed() {
+    server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+    server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+
+    client = client.newBuilder()
+        .dns(DoubleInetAddressDns()) // Two routes so we get two failures.
+        .build()
+
+    val request = Request(server.url("/"))
+    try {
+      client.newCall(request).execute()
+      fail("")
+    } catch (expected: IOException) {
+      expected.assertSuppressed {
+        val suppressed = it.single()
+        assertThat(suppressed).isInstanceOf(IOException::class.java)
+        assertThat(suppressed).isNotSameAs(expected)
+      }
+    }
+  }
+
+  @Test
+  fun responseRequestIsLastRedirect() {
+    server.enqueue(
+      MockResponse()
+        .setResponseCode(302)
+        .addHeader("Location: /b")
+    )
+    server.enqueue(MockResponse())
+
+    val request = Request(server.url("/"))
+    val call = client.newCall(request)
+    val response = call.execute()
+
+    assertThat(response.request.url.encodedPath).isEqualTo("/b")
+    assertThat(response.request.headers).isEqualTo(headersOf())
   }
 }

@@ -38,9 +38,7 @@ import org.junit.jupiter.api.fail
 
 @Timeout(30)
 @Tag("Slowish")
-class ServerTruncatesRequestTest(
-  val server: MockWebServer
-) {
+class ServerTruncatesRequestTest {
   @RegisterExtension @JvmField val platform = PlatformRule()
   @RegisterExtension @JvmField var clientTestRule = OkHttpClientTestRule()
 
@@ -51,7 +49,11 @@ class ServerTruncatesRequestTest(
       .eventListenerFactory(clientTestRule.wrap(listener))
       .build()
 
-  @BeforeEach fun setUp() {
+  private lateinit var server: MockWebServer
+
+  @BeforeEach
+  fun setUp(server: MockWebServer) {
+    this.server = server
     platform.assumeNotOpenJSSE()
     platform.assumeHttp2Support()
     platform.assumeNotBouncyCastle()
@@ -73,14 +75,14 @@ class ServerTruncatesRequestTest(
       .apply { this.http2ErrorCode = ErrorCode.NO_ERROR.httpCode })
 
     val call = client.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .post(SlowRequestBody)
-        .build()
+      Request(
+        url = server.url("/"),
+        body = SlowRequestBody,
+      )
     )
 
     call.execute().use { response ->
-      assertThat(response.body!!.string()).isEqualTo("abc")
+      assertThat(response.body.string()).isEqualTo("abc")
     }
 
     val expectedEvents = mutableListOf<String>()
@@ -129,14 +131,14 @@ class ServerTruncatesRequestTest(
     val requestBody = AsyncRequestBody()
 
     val call = client.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .post(requestBody)
-        .build()
+      Request(
+        url = server.url("/"),
+        body = requestBody,
+      )
     )
 
     call.execute().use { response ->
-      assertThat(response.body!!.string()).isEqualTo("abc")
+      assertThat(response.body.string()).isEqualTo("abc")
       val requestBodyOut = requestBody.takeSink()
       try {
         SlowRequestBody.writeTo(requestBodyOut)
@@ -181,14 +183,14 @@ class ServerTruncatesRequestTest(
     server.enqueue(mockResponse)
 
     val call = client.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .post(SlowRequestBody)
-        .build()
+      Request(
+        url = server.url("/"),
+        body = SlowRequestBody,
+      )
     )
 
     call.execute().use { response ->
-      assertThat(response.body!!.string()).isEqualTo("abc")
+      assertThat(response.body.string()).isEqualTo("abc")
       assertThat(response.trailers()).isEqualTo(headersOf("caboose", "xyz"))
     }
   }
@@ -216,25 +218,17 @@ class ServerTruncatesRequestTest(
     }
     val localClient = client.newBuilder().eventListener(eventListener).build()
 
-    val call1 = localClient.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .build()
-    )
+    val call1 = localClient.newCall(Request(server.url("/")))
 
     call1.execute().use { response ->
-      assertThat(response.body!!.string()).isEqualTo("Req1")
+      assertThat(response.body.string()).isEqualTo("Req1")
       assertThat(response.handshake).isNotNull
       assertThat(response.protocol == Protocol.HTTP_1_1)
     }
 
     eventListener.closed = true
 
-    val call2 = localClient.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .build()
-    )
+    val call2 = localClient.newCall(Request(server.url("/")))
 
     assertThrows<IOException>("fake socket failure") {
       call2.execute()
@@ -253,10 +247,10 @@ class ServerTruncatesRequestTest(
     }
 
     val callA = client.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .post(requestBody)
-        .build()
+      Request(
+        url = server.url("/"),
+        body = requestBody,
+      )
     )
 
     try {
@@ -270,25 +264,17 @@ class ServerTruncatesRequestTest(
 
     // Confirm that the connection pool was not corrupted by making another call. This doesn't use
     // makeSimpleCall() because it uses the MockResponse enqueued above.
-    val callB = client.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .build()
-    )
+    val callB = client.newCall(Request(server.url("/")))
     callB.execute().use { response ->
-      assertThat(response.body!!.string()).isEqualTo("abc")
+      assertThat(response.body.string()).isEqualTo("abc")
     }
   }
 
   private fun makeSimpleCall() {
     server.enqueue(MockResponse().setBody("healthy"))
-    val callB = client.newCall(
-      Request.Builder()
-        .url(server.url("/"))
-        .build()
-    )
+    val callB = client.newCall(Request(server.url("/")))
     callB.execute().use { response ->
-      assertThat(response.body!!.string()).isEqualTo("healthy")
+      assertThat(response.body.string()).isEqualTo("healthy")
     }
   }
 
@@ -308,7 +294,7 @@ class ServerTruncatesRequestTest(
         )
         .hostnameVerifier(RecordingHostnameVerifier())
         .build()
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false)
+    server.useHttps(handshakeCertificates.sslSocketFactory())
   }
 
   /** A request body that slowly trickles bytes, expecting to not complete. */

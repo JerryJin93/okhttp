@@ -34,16 +34,17 @@ import org.junit.jupiter.api.extension.RegisterExtension
 import org.openjsse.sun.security.ssl.SSLSocketFactoryImpl
 import org.openjsse.sun.security.ssl.SSLSocketImpl
 
-class OpenJSSETest(
-  val server: MockWebServer
-) {
+class OpenJSSETest {
   @JvmField @RegisterExtension var platform = PlatformRule()
   @JvmField @RegisterExtension val clientTestRule = OkHttpClientTestRule()
 
   var client = clientTestRule.newClient()
 
+  private lateinit var server: MockWebServer
+
   @BeforeEach
-  fun setUp() {
+  fun setUp(server: MockWebServer) {
+    this.server = server
     platform.assumeOpenJSSE()
   }
 
@@ -53,7 +54,7 @@ class OpenJSSETest(
 
     server.enqueue(MockResponse().setBody("abc"))
 
-    val request = Request.Builder().url(server.url("/")).build()
+    val request = Request(server.url("/"))
 
     val response = client.newCall(request).execute()
 
@@ -109,6 +110,6 @@ class OpenJSSETest(
         .sslSocketFactory(
             handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager)
         .build()
-    server.useHttps(handshakeCertificates.sslSocketFactory(), false)
+    server.useHttps(handshakeCertificates.sslSocketFactory())
   }
 }

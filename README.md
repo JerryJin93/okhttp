@@ -99,10 +99,10 @@ Releases
 
 Our [change log][changelog] has release history.
 
-The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/okhttp/4.9.2/jar).
+The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/okhttp/4.10.0/jar).
 
 ```kotlin
-implementation("com.squareup.okhttp3:okhttp:4.9.3")
+implementation("com.squareup.okhttp3:okhttp:4.10.0")
 ```
 
 Snapshot builds are [available][snap]. [R8 and ProGuard][r8_proguard] rules are available.
@@ -112,7 +112,7 @@ Also, we have a [bill of materials (BOM)][bom] available to help you keep OkHttp
 ```kotlin
     dependencies {
        // define a BOM and its version
-       implementation(platform("com.squareup.okhttp3:okhttp-bom:4.9.3"))
+       implementation(platform("com.squareup.okhttp3:okhttp-bom:4.10.0"))
 
        // define any required OkHttp artifacts without version
        implementation("com.squareup.okhttp3:okhttp")
@@ -125,10 +125,10 @@ MockWebServer
 
 OkHttp includes a library for testing HTTP, HTTPS, and HTTP/2 clients.
 
-The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/mockwebserver/4.9.2/jar).
+The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/mockwebserver/4.10.0/jar).
 
 ```kotlin
-testImplementation("com.squareup.okhttp3:mockwebserver:4.9.3")
+testImplementation("com.squareup.okhttp3:mockwebserver:4.10.0")
 ```
 
 GraalVM Native Image
@@ -169,12 +169,12 @@ limitations under the License.
  [conscrypt]: https://github.com/google/conscrypt/
  [get_example]: https://raw.github.com/square/okhttp/master/samples/guide/src/main/java/okhttp3/guide/GetExample.java
  [kotlin]: https://kotlinlang.org/
- [okhttp3_pro]: https://github.com/square/okhttp/blob/master/okhttp/src/main/resources/META-INF/proguard/okhttp3.pro
+ [okhttp3_pro]: https://raw.githubusercontent.com/square/okhttp/master/okhttp/src/jvmMain/resources/META-INF/proguard/okhttp3.pro
  [okhttp_312x]: https://github.com/square/okhttp/tree/okhttp_3.12.x
  [okhttp]: https://square.github.io/okhttp/
  [okio]: https://github.com/square/okio
  [post_example]: https://raw.github.com/square/okhttp/master/samples/guide/src/main/java/okhttp3/guide/PostExample.java
- [r8_proguard]: https://square.github.io/okhttp/r8_proguard/
+ [r8_proguard]: https://square.github.io/okhttp/features/r8_proguard/
  [recipes]: https://square.github.io/okhttp/recipes/
  [snap]: https://s01.oss.sonatype.org/content/repositories/snapshots/
  [tls_history]: https://square.github.io/okhttp/tls_configuration_history/

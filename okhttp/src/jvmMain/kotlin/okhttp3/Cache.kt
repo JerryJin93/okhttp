@@ -15,6 +15,15 @@
  */
 package okhttp3
 
+import java.io.Closeable
+import java.io.File
+import java.io.Flushable
+import java.io.IOException
+import java.security.cert.Certificate
+import java.security.cert.CertificateEncodingException
+import java.security.cert.CertificateException
+import java.security.cert.CertificateFactory
+import java.util.TreeSet
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.internal.EMPTY_HEADERS
@@ -42,16 +51,6 @@ import okio.Path.Companion.toOkioPath
 import okio.Sink
 import okio.Source
 import okio.buffer
-import java.io.Closeable
-import java.io.File
-import java.io.Flushable
-import java.io.IOException
-import java.security.cert.Certificate
-import java.security.cert.CertificateEncodingException
-import java.security.cert.CertificateException
-import java.security.cert.CertificateFactory
-import java.util.NoSuchElementException
-import java.util.TreeSet
 
 /**
  * Caches HTTP and HTTPS responses to the filesystem so they may be reused, saving time and
@@ -188,7 +187,7 @@ class Cache(
 
     val response = entry.response(snapshot)
     if (!entry.matches(request, response)) {
-      response.body?.closeQuietly()
+      response.body.closeQuietly()
       return null
     }
 
@@ -648,11 +647,7 @@ class Cache(
     fun response(snapshot: DiskLruCache.Snapshot): Response {
       val contentType = responseHeaders["Content-Type"]
       val contentLength = responseHeaders["Content-Length"]
-      val cacheRequest = Request.Builder()
-        .url(url)
-        .method(requestMethod, null)
-        .headers(varyHeaders)
-        .build()
+      val cacheRequest = Request(url, varyHeaders, requestMethod)
       return Response.Builder()
         .request(cacheRequest)
         .protocol(protocol)

@@ -45,13 +45,12 @@ import javax.net.ssl.SNIMatcher
 import javax.net.ssl.SNIServerName
 import javax.net.ssl.SSLSocket
 import javax.net.ssl.StandardConstants
+import org.junit.jupiter.api.BeforeEach
 
 @Suppress("UsePropertyAccessSyntax")
 @Timeout(6)
 @Tag("slow")
-class SocketChannelTest(
-  val server: MockWebServer
-) {
+class SocketChannelTest {
   @JvmField @RegisterExtension val platform = PlatformRule()
   @JvmField @RegisterExtension val clientTestRule = OkHttpClientTestRule().apply {
     recordFrames = true
@@ -72,6 +71,13 @@ class SocketChannelTest(
       .build()
   }
   private var acceptedHostName: String? = null
+
+  private lateinit var server: MockWebServer
+
+  @BeforeEach
+  fun setUp(server: MockWebServer) {
+    this.server = server
+  }
 
   @ParameterizedTest
   @MethodSource("connectionTypes")
@@ -135,7 +141,7 @@ class SocketChannelTest(
               }
             }
           }
-          server.useHttps(serverSslSocketFactory, false)
+          server.useHttps(serverSslSocketFactory)
         } else if (socketMode == Channel) {
           socketFactory(ChannelSocketFactory())
         }
@@ -171,7 +177,7 @@ class SocketChannelTest(
 
     assertThat(response).isNotNull()
 
-    assertThat(response.body!!.string()).isNotBlank()
+    assertThat(response.body.string()).isNotBlank()
 
     if (socketMode is TlsInstance) {
       assertThat(response.handshake!!.tlsVersion).isEqualTo(socketMode.tlsVersion)

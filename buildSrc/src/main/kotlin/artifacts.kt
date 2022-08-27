@@ -15,8 +15,8 @@
  */
 
 import aQute.bnd.gradle.BundleTaskExtension
-import java.io.File
 import org.gradle.api.Project
+import org.gradle.api.artifacts.VersionCatalogsExtension
 import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.tasks.SourceSetContainer
 import org.gradle.api.tasks.bundling.Jar
@@ -44,8 +44,11 @@ private fun Project.applyOsgi(
 ) {
   val osgi = project.sourceSets.create("osgi")
   val osgiApi = project.configurations.getByName(osgiApiConfigurationName)
+  val kotlinOsgi = extensions.getByType(VersionCatalogsExtension::class.java).named("libs")
+    .findLibrary("kotlin.stdlib.osgi").get().get()
+
   project.dependencies {
-    osgiApi(Dependencies.kotlinStdlibOsgi)
+    osgiApi(kotlinOsgi)
   }
 
   val jarTask = tasks.getByName<Jar>(jarTaskName)
@@ -59,24 +62,6 @@ private fun Project.applyOsgi(
   // Call the convention when the task has finished, to modify the jar to contain OSGi metadata.
   jarTask.doLast {
     bundleExtension.buildAction().execute(this)
-  }
-}
-
-/**
- * Returns a .jar file for the golden version of this project.
- * https://github.com/Visistema/Groovy1/blob/ba5eb9b2f19ca0cc8927359ce414c4e1974b7016/gradle/binarycompatibility.gradle#L48
- */
-fun Project.baselineJar(version: String = "3.14.1"): File? {
-  val originalGroup = group
-  return try {
-    val jarFile = "$name-$version.jar"
-    group = "virtual_group_for_japicmp"
-    val dependency = dependencies.create("$originalGroup:$name:$version@jar")
-    configurations.detachedConfiguration(dependency).files.find { (it.name == jarFile) }
-  } catch (e: Exception) {
-    null
-  } finally {
-    group = originalGroup
   }
 }
 

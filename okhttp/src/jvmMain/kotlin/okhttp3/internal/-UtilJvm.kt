@@ -34,35 +34,28 @@ import kotlin.text.Charsets.UTF_32LE
 import kotlin.text.Charsets.UTF_8
 import okhttp3.EventListener
 import okhttp3.Headers
-import okhttp3.Headers.Companion.headersOf
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody
-import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okhttp3.ResponseBody
-import okhttp3.ResponseBody.Companion.toResponseBody
 import okhttp3.internal.http2.Header
 import okio.Buffer
 import okio.BufferedSource
 import okio.Source
 
 @JvmField
-val EMPTY_HEADERS: Headers = headersOf()
+val EMPTY_HEADERS: Headers = commonEmptyHeaders
 @JvmField
-val EMPTY_RESPONSE: ResponseBody = EMPTY_BYTE_ARRAY.toResponseBody()
+val EMPTY_REQUEST: RequestBody = commonEmptyRequestBody
 @JvmField
-val EMPTY_REQUEST: RequestBody = EMPTY_BYTE_ARRAY.toRequestBody()
+val EMPTY_RESPONSE: ResponseBody = commonEmptyResponse
+
+actual typealias HttpUrlRepresentation = HttpUrl
 
 /** GMT and UTC are equivalent for our purposes. */
 @JvmField
 internal val UTC: TimeZone = TimeZone.getTimeZone("GMT")!!
-
-internal fun checkOffsetAndCount(arrayLength: Long, offset: Long, count: Long) {
-  if (offset or count < 0L || offset > arrayLength || arrayLength - offset < count) {
-    throw ArrayIndexOutOfBoundsException("length=$arrayLength, offset=$offset, count=$offset")
-  }
-}
 
 fun threadFactory(
   name: String,
@@ -228,15 +221,6 @@ fun <T> List<T>.toImmutableList(): List<T> {
 @SafeVarargs
 fun <T> immutableListOf(vararg elements: T): List<T> {
   return Collections.unmodifiableList(listOf(*elements.clone()))
-}
-
-/** Returns an immutable copy of this. */
-internal fun <K, V> Map<K, V>.toImmutableMap(): Map<K, V> {
-  return if (isEmpty()) {
-    emptyMap()
-  } else {
-    Collections.unmodifiableMap(LinkedHashMap(this))
-  }
 }
 
 /** Closes this, ignoring any checked exceptions. */

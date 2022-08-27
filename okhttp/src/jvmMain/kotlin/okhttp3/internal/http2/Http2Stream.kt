@@ -15,6 +15,11 @@
  */
 package okhttp3.internal.http2
 
+import java.io.EOFException
+import java.io.IOException
+import java.io.InterruptedIOException
+import java.net.SocketTimeoutException
+import java.util.ArrayDeque
 import okhttp3.Headers
 import okhttp3.internal.EMPTY_HEADERS
 import okhttp3.internal.assertThreadDoesntHoldLock
@@ -27,11 +32,6 @@ import okio.BufferedSource
 import okio.Sink
 import okio.Source
 import okio.Timeout
-import java.io.EOFException
-import java.io.IOException
-import java.io.InterruptedIOException
-import java.net.SocketTimeoutException
-import java.util.ArrayDeque
 
 /** A logical bidirectional stream. */
 @Suppress("NAME_SHADOWING")
@@ -131,16 +131,25 @@ class Http2Stream internal constructor(
    * Removes and returns the stream's received response headers, blocking if necessary until headers
    * have been received. If the returned list contains multiple blocks of headers the blocks will be
    * delimited by 'null'.
+   *
+   * @param callerIsIdle true if the caller isn't sending any more bytes until the peer responds.
+   *     This is true after a `Expect-Continue` request, false for duplex requests, and false for
+   *     all other requests.
    */
   @Synchronized @Throws(IOException::class)
-  fun takeHeaders(): Headers {
-    readTimeout.enter()
-    try {
-      while (headersQueue.isEmpty() && errorCode == null) {
-        waitForIo()
+  fun takeHeaders(callerIsIdle: Boolean = false): Headers {
+    while (headersQueue.isEmpty() && errorCode == null) {
+      val doReadTimeout = callerIsIdle || doReadTimeout()
+      if (doReadTimeout) {
+        readTimeout.enter()
       }
-    } finally {
-      readTimeout.exitAndThrowIfTimedOut()
+      try {
+        waitForIo()
+      } finally {
+        if (doReadTimeout) {
+          readTimeout.exitAndThrowIfTimedOut()
+        }
+      }
     }
     if (headersQueue.isNotEmpty()) {
       return headersQueue.removeFirst()
@@ -180,6 +189,7 @@ class Http2Stream internal constructor(
       this.hasResponseHeaders = true
       if (outFinished) {
         this.sink.finished = true
+        this@Http2Stream.notifyAll() // Because doReadTimeout() may have changed.
       }
     }
 
@@ -282,7 +292,10 @@ class Http2Stream internal constructor(
 
     val open: Boolean
     synchronized(this) {
-      if (!hasResponseHeaders || !inFinished) {
+      if (!hasResponseHeaders ||
+        headers[Header.RESPONSE_STATUS_UTF8] != null ||
+        headers[Header.TARGET_METHOD_UTF8] != null
+      ) {
         hasResponseHeaders = true
         headersQueue += headers
       } else {
@@ -305,6 +318,16 @@ class Http2Stream internal constructor(
       notifyAll()
     }
   }
+
+  /**
+   * Returns true if read timeouts should be enforced while reading response headers or body bytes.
+   * We always do timeouts in the HTTP server role. For clients, we only do timeouts after the
+   * request is transmitted. This is only interesting for duplex calls where the request and
+   * response may be interleaved.
+   *
+   * Read this value only once for each enter/exit pair because its value can change.
+   */
+  private fun doReadTimeout() = !connection.client || sink.closed || sink.finished
 
   /**
    * A source that reads the incoming data frames of a stream. Although this class uses
@@ -348,7 +371,10 @@ class Http2Stream internal constructor(
         // 1. Decide what to do in a synchronized block.
 
         synchronized(this@Http2Stream) {
-          readTimeout.enter()
+          val doReadTimeout = doReadTimeout()
+          if (doReadTimeout) {
+            readTimeout.enter()
+          }
           try {
             if (errorCode != null && !finished) {
               // Prepare to deliver an error.
@@ -376,7 +402,9 @@ class Http2Stream internal constructor(
               tryAgain = true
             }
           } finally {
-            readTimeout.exitAndThrowIfTimedOut()
+            if (doReadTimeout) {
+              readTimeout.exitAndThrowIfTimedOut()
+            }
           }
         }
 
@@ -620,6 +648,7 @@ class Http2Stream internal constructor(
       }
       synchronized(this@Http2Stream) {
         closed = true
+        this@Http2Stream.notifyAll() // Because doReadTimeout() may have changed.
       }
       connection.flush()
       cancelStreamIfNecessary()
