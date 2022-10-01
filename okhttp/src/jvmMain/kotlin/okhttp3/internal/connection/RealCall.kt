@@ -165,6 +165,7 @@ class RealCall(
     check(executed.compareAndSet(false, true)) { "Already Executed" }
 
     callStart()
+    // 1个RealCall可以指向多个AsyncCall
     client.dispatcher.enqueue(AsyncCall(responseCallback))
   }
 
@@ -248,6 +249,7 @@ class RealCall(
       check(!requestBodyOpen)
     }
 
+    // 初始化routePlanner和exchangeFinder
     if (newRoutePlanner) {
       val routePlanner = RealRoutePlanner(
         client,
@@ -257,9 +259,11 @@ class RealCall(
       )
       this.exchangeFinder = when {
         client.fastFallback -> FastFallbackExchangeFinder(routePlanner, client.taskRunner)
+        // SequentialExchangeFinder by default.
         else -> SequentialExchangeFinder(routePlanner)
       }
     }
+    // 总而延迟，此方法用于初始化RoutePlanner以及ExchangeFinder
   }
 
   /** Finds a new or pooled connection to carry a forthcoming request and response. */
@@ -271,6 +275,7 @@ class RealCall(
     }
 
     val exchangeFinder = this.exchangeFinder!!
+    // establish a connection by exchangeFinder
     val connection = exchangeFinder.find()
     val codec = connection.newCodec(client, chain)
     val result = Exchange(this, eventListener, exchangeFinder, codec)
@@ -285,6 +290,9 @@ class RealCall(
     return result
   }
 
+  /**
+   * RealConnection与Call建立一对多的关系
+   */
   fun acquireConnectionNoEvents(connection: RealConnection) {
     connection.assertThreadHoldsLock()
 

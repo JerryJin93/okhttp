@@ -33,6 +33,9 @@ import okio.buffer
  */
 class BridgeInterceptor(private val cookieJar: CookieJar) : Interceptor {
 
+  /**
+   * Add some headers if necessary, then proceed the request.
+   */
   @Throws(IOException::class)
   override fun intercept(chain: Interceptor.Chain): Response {
     val userRequest = chain.request()

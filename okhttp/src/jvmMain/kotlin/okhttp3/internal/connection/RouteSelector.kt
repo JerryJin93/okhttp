@@ -53,6 +53,7 @@ class RouteSelector(
   private val postponedRoutes = mutableListOf<Route>()
 
   init {
+    // 初始化proxy
     resetNextProxy(address.url, address.proxy)
   }
 

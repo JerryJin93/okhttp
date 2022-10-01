@@ -53,9 +53,11 @@ class RealRoutePlanner(
 
   @Throws(IOException::class)
   override fun plan(): Plan {
+    // 如果能复用当前连接则复用
     val reuseCallConnection = planReuseCallConnection()
     if (reuseCallConnection != null) return reuseCallConnection
 
+    // 当前连接无法复用，从连接池中寻找
     // Attempt to get a connection from the pool.
     val pooled1 = planReusePooledConnection()
     if (pooled1 != null) return pooled1
@@ -63,6 +65,7 @@ class RealRoutePlanner(
     // Attempt a deferred plan before new routes.
     if (deferredPlans.isNotEmpty()) return deferredPlans.removeFirst()
 
+    // 规划新的连接，并创建ConnectPlan实例
     // Do blocking calls to plan a route for a new connection.
     val connect = planConnect()
 
@@ -149,6 +152,7 @@ class RealRoutePlanner(
 
     if (call.isCanceled()) throw IOException("Canceled")
 
+    // 规划网络连接路径，并创建ConnectPlan
     return planConnectToRoute(newRouteSelection.next(), newRouteSelection.routes)
   }
 
@@ -163,6 +167,7 @@ class RealRoutePlanner(
     planToReplace: ConnectPlan? = null,
     routes: List<Route>? = null,
   ): ReusePlan? {
+    // retrieve a used connection from the RealConnectionPool
     val result = client.connectionPool.delegate.callAcquirePooledConnection(
       doExtensiveHealthChecks = doExtensiveHealthChecks,
       address = address,

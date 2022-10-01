@@ -31,6 +31,7 @@ import okhttp3.internal.connection.RealConnectionPool
  * inactivity.
  */
 class ConnectionPool internal constructor(
+  // static proxy mode 静态代理模式
   internal val delegate: RealConnectionPool
 ) {
   constructor(

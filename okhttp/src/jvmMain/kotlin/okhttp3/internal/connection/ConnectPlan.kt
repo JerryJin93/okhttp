@@ -116,6 +116,9 @@ class ConnectPlan(
     )
   }
 
+  /**
+   * 进行TCP连接(Socket)，并获取输入输出流，基于Okio, 输入 <=> Source, 输出 <=> Sink
+   */
   override fun connectTcp(): ConnectResult {
     check(rawSocket == null) { "TCP already connected" }
 
@@ -127,6 +130,7 @@ class ConnectPlan(
       eventListener.connectStart(call, route.socketAddress, route.proxy)
       connectSocket()
       success = true
+      // 连接成功
       return ConnectResult(plan = this)
     } catch (e: IOException) {
       eventListener.connectFailed(call, route.socketAddress, route.proxy, null, e)
@@ -474,6 +478,7 @@ class ConnectPlan(
 
     val connection = this.connection!!
     synchronized(connection) {
+      // 缓存当前连接，并执行清理工作
       client.connectionPool.delegate.put(connection)
       call.acquireConnectionNoEvents(connection)
     }

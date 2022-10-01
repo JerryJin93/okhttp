@@ -73,6 +73,7 @@ class RetryAndFollowUpInterceptor(private val client: OkHttpClient) : Intercepto
             recoveredFailures += e
           }
           newRoutePlanner = false
+          // retry, but use the last routerPlanner instead.
           continue
         }
 
@@ -82,6 +83,7 @@ class RetryAndFollowUpInterceptor(private val client: OkHttpClient) : Intercepto
           .priorResponse(priorResponse?.stripBody())
           .build()
 
+        // 这个Exchange在ConnectInterceptor中被初始化
         val exchange = call.interceptorScopedExchange
         val followUp = followUpRequest(response, exchange)
 
@@ -200,6 +202,7 @@ class RetryAndFollowUpInterceptor(private val client: OkHttpClient) : Intercepto
 
       HTTP_UNAUTHORIZED -> return client.authenticator.authenticate(route, userResponse)
 
+      // REDIRECT -> build redirect request.
       HTTP_PERM_REDIRECT, HTTP_TEMP_REDIRECT, HTTP_MULT_CHOICE, HTTP_MOVED_PERM, HTTP_MOVED_TEMP, HTTP_SEE_OTHER -> {
         return buildRedirectRequest(userResponse, method)
       }

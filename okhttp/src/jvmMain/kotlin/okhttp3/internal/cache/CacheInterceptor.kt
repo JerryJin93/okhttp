@@ -44,6 +44,7 @@ class CacheInterceptor(internal val cache: Cache?) : Interceptor {
 
   @Throws(IOException::class)
   override fun intercept(chain: Interceptor.Chain): Response {
+    // get the RealCall instance of the chain.
     val call = chain.call()
     val cacheCandidate = cache?.get(chain.request())
 

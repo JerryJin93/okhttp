@@ -42,6 +42,7 @@ class RealConnectionPool(
 
   private val cleanupQueue: TaskQueue = taskRunner.newQueue()
   private val cleanupTask = object : Task("$okHttpName ConnectionPool") {
+    // 清理空闲时间过长的符合清理条件的RealConnection
     override fun runOnce(): Long = cleanup(System.nanoTime())
   }
 
@@ -114,6 +115,9 @@ class RealConnectionPool(
     return null
   }
 
+  /**
+   * Add RealConnection instance to pool and schedule cleanup task.
+   */
   fun put(connection: RealConnection) {
     connection.assertThreadHoldsLock()
 
