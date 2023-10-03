@@ -56,9 +56,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.RegisterExtension;
-import static mockwebserver3.SocketPolicy.DISCONNECT_AT_END;
+import static mockwebserver3.SocketPolicy.DisconnectAtEnd;
 import static okhttp3.internal.Internal.cacheGet;
-import static okhttp3.tls.internal.TlsUtil.localhost;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.data.Offset.offset;
 import static org.junit.jupiter.api.Assertions.fail;
@@ -73,7 +72,8 @@ public final class CacheTest {
 
   private MockWebServer server;
   private MockWebServer server2;
-  private final HandshakeCertificates handshakeCertificates = localhost();
+  private final HandshakeCertificates handshakeCertificates
+    = platform.localhostHandshakeCertificates();
   private OkHttpClient client;
   private Cache cache;
   private final CookieManager cookieManager = new CookieManager();
@@ -87,7 +87,6 @@ public final class CacheTest {
     this.server2 = server2;
 
     platform.assumeNotOpenJSSE();
-    platform.assumeNotBouncyCastle();
 
     server.setProtocolNegotiationEnabled(false);
     fileSystem.emulateUnix();
@@ -117,7 +116,6 @@ public final class CacheTest {
     // We can't test 100 because it's not really a response.
     // assertCached(false, 100);
     assertCached(false, 101);
-    assertCached(false, 102);
     assertCached(true, 200);
     assertCached(false, 201);
     assertCached(false, 202);
@@ -164,7 +162,12 @@ public final class CacheTest {
     assertCached(false, 506);
   }
 
-  private void assertCached(boolean shouldPut, int responseCode) throws Exception {
+  @Test public void responseCachingWith1xxInformationalResponse() throws Exception {
+    assertSubsequentResponseCached( 102, 200);
+    assertSubsequentResponseCached( 103, 200);
+  }
+
+  private void assertCached(boolean shouldWriteToCache, int responseCode) throws Exception {
     int expectedResponseCode = responseCode;
 
     server = new MockWebServer();
@@ -207,12 +210,39 @@ public final class CacheTest {
     response.body().string();
 
     Response cached = cacheGet(cache, request);
-    if (shouldPut) {
+    if (shouldWriteToCache) {
       assertThat(cached).isNotNull();
       cached.body().close();
     } else {
       assertThat(cached).isNull();
     }
+    server.shutdown(); // tearDown() isn't sufficient; this test starts multiple servers
+  }
+
+  private void assertSubsequentResponseCached(int initialResponseCode, int finalResponseCode) throws Exception {
+    server = new MockWebServer();
+    MockResponse.Builder builder = new MockResponse.Builder()
+      .addHeader("Last-Modified: " + formatDate(-1, TimeUnit.HOURS))
+      .addHeader("Expires: " + formatDate(1, TimeUnit.HOURS))
+      .code(finalResponseCode)
+      .body("ABCDE")
+      .addInformationalResponse(new MockResponse(initialResponseCode));
+
+    server.enqueue(builder.build());
+    server.start();
+
+    Request request = new Request.Builder()
+      .url(server.url("/"))
+      .build();
+    Response response = client.newCall(request).execute();
+    assertThat(response.code()).isEqualTo(finalResponseCode);
+
+    // Exhaust the content stream.
+    response.body().string();
+
+    Response cached = cacheGet(cache, request);
+    assertThat(cached).isNotNull();
+    cached.body().close();
     server.shutdown(); // tearDown() isn't sufficient; this test starts multiple servers
   }
 
@@ -306,6 +336,49 @@ public final class CacheTest {
     assertThat(response2.handshake().peerCertificates()).isEqualTo(serverCerts);
     assertThat(response2.handshake().peerPrincipal()).isEqualTo(peerPrincipal);
     assertThat(response2.handshake().localPrincipal()).isEqualTo(localPrincipal);
+  }
+
+  @Test public void secureResponseCachingWithCorruption() throws IOException {
+    server.useHttps(handshakeCertificates.sslSocketFactory());
+    server.enqueue(new MockResponse.Builder()
+            .addHeader("Last-Modified: " + formatDate(-1, TimeUnit.HOURS))
+            .addHeader("Expires: " + formatDate(1, TimeUnit.HOURS))
+            .body("ABC")
+            .build());
+    server.enqueue(new MockResponse.Builder()
+            .addHeader("Last-Modified: " + formatDate(-5, TimeUnit.MINUTES))
+            .addHeader("Expires: " + formatDate(2, TimeUnit.HOURS))
+            .body("DEF")
+            .build());
+
+    client = client.newBuilder()
+            .sslSocketFactory(
+                    handshakeCertificates.sslSocketFactory(), handshakeCertificates.trustManager())
+            .hostnameVerifier(NULL_HOSTNAME_VERIFIER)
+            .build();
+
+    Request request = new Request.Builder().url(server.url("/")).build();
+    Response response1 = client.newCall(request).execute();
+    assertThat(response1.body().string()).isEqualTo("ABC");
+
+    Path cacheEntry = fileSystem.allPaths().stream()
+            .filter((e) -> e.name().endsWith(".0"))
+            .findFirst()
+            .orElseThrow();
+    corruptCertificate(cacheEntry);
+
+    Response response2 = client.newCall(request).execute(); // Not Cached!
+    assertThat(response2.body().string()).isEqualTo("DEF");
+
+    assertThat(cache.requestCount()).isEqualTo(2);
+    assertThat(cache.networkCount()).isEqualTo(2);
+    assertThat(cache.hitCount()).isEqualTo(0);
+  }
+
+  private void corruptCertificate(Path cacheEntry) throws IOException {
+    String content = Okio.buffer(fileSystem.source(cacheEntry)).readUtf8();
+    content = content.replace("MII", "!!!");
+    Okio.buffer(fileSystem.sink(cacheEntry)).writeUtf8(content).close();
   }
 
   @Test public void responseCachingAndRedirects() throws Exception {
@@ -2889,12 +2962,15 @@ public final class CacheTest {
    * Shortens the body of {@code response} but not the corresponding headers. Only useful to test
    * how clients respond to the premature conclusion of the HTTP body.
    */
-  private MockResponse.Builder truncateViolently(MockResponse.Builder builder, int numBytesToKeep) {
+  private MockResponse.Builder truncateViolently(
+      MockResponse.Builder builder, int numBytesToKeep) throws IOException {
     MockResponse response = builder.build();
-    builder.socketPolicy(DISCONNECT_AT_END);
+    builder.socketPolicy(DisconnectAtEnd.INSTANCE);
     Headers headers = response.getHeaders();
+    Buffer fullBody = new Buffer();
+    response.getBody().writeTo(fullBody);
     Buffer truncatedBody = new Buffer();
-    truncatedBody.write(response.getBody(), numBytesToKeep);
+    truncatedBody.write(fullBody, numBytesToKeep);
     builder.body(truncatedBody);
     builder.headers(headers);
     return builder;
@@ -2914,7 +2990,7 @@ public final class CacheTest {
     END_OF_STREAM {
       @Override void setBody(MockResponse.Builder response, Buffer content, int chunkSize) {
         response.body(content);
-        response.socketPolicy(DISCONNECT_AT_END);
+        response.socketPolicy(DisconnectAtEnd.INSTANCE);
         response.removeHeader("Content-Length");
       }
     };

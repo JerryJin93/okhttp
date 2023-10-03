@@ -1,15 +1,20 @@
+@file:Suppress("UnstableApiUsage")
+
 plugins {
   id("com.android.library")
   kotlin("android")
   id("de.mannodermaus.android-junit5")
 }
 
+val androidBuild = property("androidBuild").toString().toBoolean()
+
 android {
-  compileSdk = 31
+  compileSdk = 33
+
+  namespace = "okhttp.android.test"
 
   defaultConfig {
     minSdk = 21
-    targetSdk = 31
 
     // Make sure to use the AndroidJUnitRunner (or a sub-class) in order to hook in the JUnit 5 Test Builder
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
@@ -19,12 +24,14 @@ android {
     )
   }
 
-  sourceSets["androidTest"].java.srcDirs(
-    "../okhttp-brotli/src/test/java",
-    "../okhttp-dnsoverhttps/src/test/java",
-    "../okhttp-logging-interceptor/src/test/java",
-    "../okhttp-sse/src/test/java"
-  )
+  if (androidBuild) {
+    sourceSets["androidTest"].java.srcDirs(
+      "../okhttp-brotli/src/test/java",
+      "../okhttp-dnsoverhttps/src/test/java",
+      "../okhttp-logging-interceptor/src/test/java",
+      "../okhttp-sse/src/test/java"
+    )
+  }
 
   compileOptions {
     targetCompatibility(JavaVersion.VERSION_11)

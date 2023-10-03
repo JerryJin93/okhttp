@@ -1,7 +1,7 @@
 plugins {
   kotlin("jvm")
   application
-  id("com.google.devtools.ksp").version("1.8.0-1.0.8")
+  id("com.google.devtools.ksp").version("1.9.0-1.0.13")
 }
 
 application {
@@ -18,7 +18,7 @@ dependencies {
   implementation(libs.squareup.moshi)
   implementation(libs.squareup.moshi.kotlin)
 
-  ksp("com.squareup.moshi:moshi-kotlin-codegen:1.14.0")
+  ksp("com.squareup.moshi:moshi-kotlin-codegen:1.15.0")
 }
 
 tasks.compileJava {

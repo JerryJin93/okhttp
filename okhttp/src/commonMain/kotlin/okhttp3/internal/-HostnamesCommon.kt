@@ -15,6 +15,8 @@
  */
 package okhttp3.internal
 
+import okhttp3.internal.idn.IDNA_MAPPING_TABLE
+import okhttp3.internal.idn.Punycode
 import okio.Buffer
 
 /**
@@ -225,4 +227,109 @@ internal fun inet6AddressToAscii(address: ByteArray): String {
   return result.readUtf8()
 }
 
-expect fun String.toCanonicalHost(): String?
+/**
+ * Returns the canonical address for [address]. If [address] is an IPv6 address that is mapped to an
+ * IPv4 address, this returns the IPv4-mapped address. Otherwise, this returns [address].
+ *
+ * https://en.wikipedia.org/wiki/IPv6#IPv4-mapped_IPv6_addresses
+ */
+internal fun canonicalizeInetAddress(address: ByteArray): ByteArray {
+  return when {
+    isMappedIpv4Address(address) -> address.sliceArray(12 until 16)
+    else -> address
+  }
+}
+
+/** Returns true for IPv6 addresses like `0000:0000:0000:0000:0000:ffff:XXXX:XXXX`. */
+private fun isMappedIpv4Address(address: ByteArray): Boolean {
+  if (address.size != 16) return false
+
+  for (i in 0 until 10) {
+    if (address[i] != 0.toByte()) return false
+  }
+
+  if (address[10] != 255.toByte()) return false
+  if (address[11] != 255.toByte()) return false
+
+  return true
+}
+
+/** Encodes an IPv4 address in canonical form according to RFC 4001. */
+internal fun inet4AddressToAscii(address: ByteArray): String {
+  require(address.size == 4)
+  return Buffer()
+    .writeDecimalLong((address[0] and 0xff).toLong())
+    .writeByte('.'.code)
+    .writeDecimalLong((address[1] and 0xff).toLong())
+    .writeByte('.'.code)
+    .writeDecimalLong((address[2] and 0xff).toLong())
+    .writeByte('.'.code)
+    .writeDecimalLong((address[3] and 0xff).toLong())
+    .readUtf8()
+}
+
+/**
+ * If this is an IP address, this returns the IP address in canonical form.
+ *
+ * Otherwise, this performs IDN ToASCII encoding and canonicalize the result to lowercase. For
+ * example this converts `☃.net` to `xn--n3h.net`, and `WwW.GoOgLe.cOm` to `www.google.com`.
+ * `null` will be returned if the host cannot be ToASCII encoded or if the result contains
+ * unsupported ASCII characters.
+ */
+internal fun String.toCanonicalHost(): String? {
+  val host: String = this
+
+  // If the input contains a :, it’s an IPv6 address.
+  if (":" in host) {
+    // If the input is encased in square braces "[...]", drop 'em.
+    val inetAddressByteArray = (if (host.startsWith("[") && host.endsWith("]")) {
+      decodeIpv6(host, 1, host.length - 1)
+    } else {
+      decodeIpv6(host, 0, host.length)
+    }) ?: return null
+
+    val address = canonicalizeInetAddress(inetAddressByteArray)
+    if (address.size == 16) return inet6AddressToAscii(address)
+    if (address.size == 4) return inet4AddressToAscii(address) // An IPv4-mapped IPv6 address.
+    throw AssertionError("Invalid IPv6 address: '$host'")
+  }
+
+  val result = idnToAscii(host) ?: return null
+  if (result.isEmpty()) return null
+  if (result.containsInvalidHostnameAsciiCodes()) return null
+  if (result.containsInvalidLabelLengths()) return null
+
+  return result
+}
+
+internal fun idnToAscii(host: String): String? {
+  val bufferA = Buffer().writeUtf8(host)
+  val bufferB = Buffer()
+
+  // 1. Map, from bufferA to bufferB.
+  while (!bufferA.exhausted()) {
+    val codePoint = bufferA.readUtf8CodePoint()
+    if(!IDNA_MAPPING_TABLE.map(codePoint, bufferB)) return null
+  }
+
+  // 2. Normalize, from bufferB to bufferA.
+  val normalized = normalizeNfc(bufferB.readUtf8())
+  bufferA.writeUtf8(normalized)
+
+  // 3. For each label, convert/validate Punycode.
+  val decoded = Punycode.decode(bufferA.readUtf8()) ?: return null
+
+  // 4.1 Validate.
+
+  // Must be NFC.
+  if (decoded != normalizeNfc(decoded)) return null
+
+  // TODO: Must not begin with a combining mark.
+  // TODO: Each character must be 'valid' or 'deviation'. Not mapped.
+  // TODO: CheckJoiners from IDNA 2008
+  // TODO: CheckBidi from IDNA 2008, RFC 5893, Section 2.
+
+  return Punycode.encode(decoded)
+}
+
+internal expect fun normalizeNfc(string: String): String

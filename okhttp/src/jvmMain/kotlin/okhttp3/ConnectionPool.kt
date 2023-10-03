@@ -34,16 +34,46 @@ class ConnectionPool internal constructor(
   // static proxy mode 静态代理模式
   internal val delegate: RealConnectionPool
 ) {
+  internal constructor(
+    maxIdleConnections: Int = 5,
+    keepAliveDuration: Long = 5,
+    timeUnit: TimeUnit = TimeUnit.MINUTES,
+    taskRunner: TaskRunner = TaskRunner.INSTANCE,
+    connectionListener: ConnectionListener = ConnectionListener.NONE,
+  ) : this(RealConnectionPool(
+      taskRunner = taskRunner,
+      maxIdleConnections = maxIdleConnections,
+      keepAliveDuration = keepAliveDuration,
+      timeUnit = timeUnit,
+      connectionListener = connectionListener
+  ))
+
+  // Public API
+  constructor(
+    maxIdleConnections: Int = 5,
+    keepAliveDuration: Long = 5,
+    timeUnit: TimeUnit = TimeUnit.MINUTES,
+    connectionListener: ConnectionListener = ConnectionListener.NONE,
+  ) : this(
+    taskRunner = TaskRunner.INSTANCE,
+    maxIdleConnections = maxIdleConnections,
+    keepAliveDuration = keepAliveDuration,
+    timeUnit = timeUnit,
+    connectionListener = connectionListener
+  )
+
+  // Public API
   constructor(
     maxIdleConnections: Int,
     keepAliveDuration: Long,
-    timeUnit: TimeUnit
-  ) : this(RealConnectionPool(
-      taskRunner = TaskRunner.INSTANCE,
-      maxIdleConnections = maxIdleConnections,
-      keepAliveDuration = keepAliveDuration,
-      timeUnit = timeUnit
-  ))
+    timeUnit: TimeUnit,
+  ) : this(
+    maxIdleConnections = maxIdleConnections,
+    keepAliveDuration = keepAliveDuration,
+    timeUnit = timeUnit,
+    taskRunner = TaskRunner.INSTANCE,
+    connectionListener = ConnectionListener.NONE
+  )
 
   constructor() : this(5, 5, TimeUnit.MINUTES)
 
@@ -52,6 +82,9 @@ class ConnectionPool internal constructor(
 
   /** Returns total number of connections in the pool. */
   fun connectionCount(): Int = delegate.connectionCount()
+
+  internal val connectionListener: ConnectionListener
+    get() = delegate.connectionListener
 
   /** Close and remove all idle connections in the pool. */
   fun evictAll() {

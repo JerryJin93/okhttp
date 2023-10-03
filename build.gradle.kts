@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 import com.vanniktech.maven.publish.MavenPublishBaseExtension
 import com.vanniktech.maven.publish.SonatypeHost
 import groovy.util.Node
@@ -6,6 +8,9 @@ import java.net.URL
 import kotlinx.validation.ApiValidationExtension
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.dokka.gradle.DokkaTask
+import org.jetbrains.kotlin.gradle.targets.js.testing.KotlinJsTest
+import org.jetbrains.kotlin.gradle.targets.jvm.tasks.KotlinJvmTest
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeTest
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import ru.vyarus.gradle.plugin.animalsniffer.AnimalSnifferExtension
 
@@ -13,6 +18,7 @@ buildscript {
   dependencies {
     classpath(libs.gradlePlugin.dokka)
     classpath(libs.gradlePlugin.kotlin)
+    classpath(libs.gradlePlugin.kotlinSerialization)
     classpath(libs.gradlePlugin.androidJunit5)
     classpath(libs.gradlePlugin.android)
     classpath(libs.gradlePlugin.graal)
@@ -82,7 +88,7 @@ subprojects {
 
   configure<JavaPluginExtension> {
     toolchain {
-      languageVersion.set(JavaLanguageVersion.of(11))
+      languageVersion.set(JavaLanguageVersion.of(17))
     }
   }
 
@@ -111,8 +117,19 @@ subprojects {
 
   val signature: Configuration by configurations.getting
   dependencies {
-    signature(rootProject.libs.signature.android.apilevel21)
-    signature(rootProject.libs.codehaus.signature.java18)
+    // No dependency requirements for testing-support.
+    if (project.name == "okhttp-testing-support") return@dependencies
+
+    if (project.name == "mockwebserver3-junit5") {
+      // JUnit 5's APIs need java.util.function.Function and java.util.Optional from API 24.
+      signature(rootProject.libs.signature.android.apilevel24) { artifact { type = "signature" } }
+    } else {
+      // Everything else requires Android API 21+.
+      signature(rootProject.libs.signature.android.apilevel21) { artifact { type = "signature" } }
+    }
+
+    // OkHttp requires Java 8+.
+    signature(rootProject.libs.codehaus.signature.java18) { artifact { type = "signature" } }
   }
 
   tasks.withType<KotlinCompile> {
@@ -125,7 +142,7 @@ subprojects {
   }
 
   val platform = System.getProperty("okhttp.platform", "jdk9")
-  val testJavaVersion = System.getProperty("test.java.version", "11").toInt()
+  val testJavaVersion = System.getProperty("test.java.version", "17").toInt()
 
   val testRuntimeOnly: Configuration by configurations.getting
   dependencies {
@@ -135,10 +152,17 @@ subprojects {
 
   tasks.withType<Test> {
     useJUnitPlatform()
-    jvmArgs = jvmArgs!! + listOf(
+    jvmArgs(
       "-Dokhttp.platform=$platform",
       "-XX:+HeapDumpOnOutOfMemoryError"
     )
+
+    if (platform == "loom") {
+      jvmArgs(
+        "-Djdk.tracePinnedThread=full",
+        "--enable-preview"
+      )
+    }
 
     val javaToolchains = project.extensions.getByType<JavaToolchainService>()
     javaLauncher.set(javaToolchains.launcherFor {
@@ -154,6 +178,18 @@ subprojects {
     systemProperty("junit.jupiter.extensions.autodetection.enabled", "true")
   }
 
+  // https://publicobject.com/2023/04/16/read-a-project-file-in-a-kotlin-multiplatform-test/
+  tasks.withType<KotlinJvmTest>().configureEach {
+    environment("OKHTTP_ROOT", rootDir)
+  }
+  tasks.withType<KotlinNativeTest>().configureEach {
+    environment("SIMCTL_CHILD_OKHTTP_ROOT", rootDir)
+    environment("OKHTTP_ROOT", rootDir)
+  }
+  tasks.withType<KotlinJsTest>().configureEach {
+    environment("OKHTTP_ROOT", rootDir.toString())
+  }
+
   if (platform == "jdk8alpn") {
     // Add alpn-boot on Java 8 so we can use HTTP/2 without a stable API.
     val alpnBootVersion = alpnBootVersion()
@@ -162,7 +198,7 @@ subprojects {
         dependencies.create("org.mortbay.jetty.alpn:alpn-boot:$alpnBootVersion")
       ).singleFile
       tasks.withType<Test> {
-        jvmArgs = jvmArgs!! + listOf("-Xbootclasspath/p:${alpnBootJar}")
+        jvmArgs("-Xbootclasspath/p:${alpnBootJar}")
       }
     }
   } else if (platform == "conscrypt") {
@@ -273,6 +309,13 @@ subprojects {
       ignoredPackages += "okhttp3.brotli.internal"
       ignoredPackages += "okhttp3.sse.internal"
       ignoredPackages += "okhttp3.tls.internal"
+    }
+  }
+
+  plugins.withId("org.jetbrains.kotlin.jvm") {
+    val jvmTest by tasks.creating {
+      description = "Get 'gradlew jvmTest' to run the tests of JVM-only modules"
+      dependsOn("test")
     }
   }
 }

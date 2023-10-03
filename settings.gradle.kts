@@ -11,9 +11,9 @@ project(":mockwebserver-junit5").name = "mockwebserver3-junit5"
 
 val androidBuild: String by settings
 val graalBuild: String by settings
+val loomBuild: String by settings
 
 if (androidBuild.toBoolean()) {
-  include(":android-test")
   include(":regression-test")
 }
 
@@ -23,11 +23,11 @@ if (graalBuild.toBoolean()) {
 
 include(":okcurl")
 include(":okhttp")
-include(":okhttp-android")
 include(":okhttp-bom")
 include(":okhttp-brotli")
 include(":okhttp-dnsoverhttps")
 include(":okhttp-hpacktests")
+include(":okhttp-idna-mapping-table")
 include(":okhttp-logging-interceptor")
 project(":okhttp-logging-interceptor").name = "logging-interceptor"
 include(":okhttp-sse")
@@ -44,4 +44,22 @@ include(":samples:static-server")
 include(":samples:tlssurvey")
 include(":samples:unixdomainsockets")
 
+if (isIdea20232OrHigher()) {
+  include(":okhttp-android")
+  include(":android-test")
+}
+
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
+fun isIdea20232OrHigher(): Boolean {
+  // No problem outside Idea
+  val ideaVersionString = System.getProperty("idea.version") ?: return true
+
+  return try {
+    val (major, minor, _) = ideaVersionString.split(".", limit = 3)
+    KotlinVersion(major.toInt(), minor.toInt()) >= KotlinVersion(2023, 2)
+  } catch (e: Exception) {
+    // Unknown version, presumably compatible
+    true
+  }
+}

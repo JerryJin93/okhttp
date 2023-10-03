@@ -81,16 +81,15 @@ track][tls_history] the dynamic TLS ecosystem and adjust OkHttp to improve conne
 security.
 
 OkHttp uses your platform's built-in TLS implementation. On Java platforms OkHttp also supports
-[Conscrypt][conscrypt], which integrates BoringSSL with Java. OkHttp will use Conscrypt if it is
+[Conscrypt][conscrypt], which integrates [BoringSSL](https://github.com/google/boringssl) with Java. OkHttp will use Conscrypt if it is
 the first security provider:
 
 ```java
 Security.insertProviderAt(Conscrypt.newProvider(), 1);
 ```
 
-The OkHttp 3.12.x branch supports Android 2.3+ (API level 9+) and Java 7+. These platforms lack
-support for TLS 1.2 and should not be used. But because upgrading is difficult, we will backport
-critical fixes to the [3.12.x branch][okhttp_312x] through December 31, 2021.
+The OkHttp `3.12.x` branch supports Android 2.3+ (API level 9+) and Java 7+. These platforms lack
+support for TLS 1.2 and should not be used.
 
 
 Releases
@@ -98,10 +97,10 @@ Releases
 
 Our [change log][changelog] has release history.
 
-The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/okhttp/4.10.0/jar).
+The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/okhttp/4.11.0/jar).
 
 ```kotlin
-implementation("com.squareup.okhttp3:okhttp:4.10.0")
+implementation("com.squareup.okhttp3:okhttp:4.11.0")
 ```
 
 Snapshot builds are [available][snap]. [R8 and ProGuard][r8_proguard] rules are available.
@@ -111,7 +110,7 @@ Also, we have a [bill of materials (BOM)][bom] available to help you keep OkHttp
 ```kotlin
     dependencies {
        // define a BOM and its version
-       implementation(platform("com.squareup.okhttp3:okhttp-bom:4.10.0"))
+       implementation(platform("com.squareup.okhttp3:okhttp-bom:4.11.0"))
 
        // define any required OkHttp artifacts without version
        implementation("com.squareup.okhttp3:okhttp")
@@ -124,17 +123,17 @@ MockWebServer
 
 OkHttp includes a library for testing HTTP, HTTPS, and HTTP/2 clients.
 
-The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/mockwebserver/4.10.0/jar).
+The latest release is available on [Maven Central](https://search.maven.org/artifact/com.squareup.okhttp3/mockwebserver/4.11.0/jar).
 
 ```kotlin
-testImplementation("com.squareup.okhttp3:mockwebserver:4.10.0")
+testImplementation("com.squareup.okhttp3:mockwebserver:4.11.0")
 ```
 
 GraalVM Native Image
 --------------------
 
 Building your native images with Graal https://www.graalvm.org/ should work automatically.
-This is not currently in a final released version, so 5.0.0-alpha.2 should be used.
+This is not currently in a final released version, so `5.0.0-alpha.2` should be used.
 Please report any bugs or workarounds you find.
 
 See the okcurl module for an example build.

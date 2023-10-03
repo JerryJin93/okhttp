@@ -6,7 +6,7 @@ This module integrates mockwebserver3.MockWebServer with JUnit 5.
 To use, first add this library as a test dependency:
 
 ```
-testRuntimeOnly("com.squareup.okhttp3:mockwebserver3-junit5:4.10.0")
+testRuntimeOnly("com.squareup.okhttp3:mockwebserver3-junit5:4.11.0")
 ```
 
 Then in tests annotated `@org.junit.jupiter.api.Test`, you may add a [MockWebServer] as a test
@@ -50,3 +50,10 @@ class MyTest(
   }
 }
 ```
+
+Requirements
+------------
+
+MockWebServer's JUnit 5 integration works on Android 7.0+ (API level 24+) and Java 8+. Note that
+this is above OkHttp's core requirements.
+

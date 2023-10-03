@@ -1,15 +1,21 @@
 import com.android.build.gradle.internal.tasks.factory.dependsOn
 import com.vanniktech.maven.publish.JavadocJar
-import com.vanniktech.maven.publish.KotlinJvm
+import com.vanniktech.maven.publish.KotlinMultiplatform
 import org.apache.tools.ant.taskdefs.condition.Os
 
 plugins {
   kotlin("multiplatform")
-  kotlin("kapt")
   id("org.jetbrains.dokka")
   id("com.vanniktech.maven.publish.base")
   id("com.palantir.graal")
   id("com.github.johnrengelman.shadow")
+}
+
+val copyResourcesTemplates = tasks.register<Copy>("copyResourcesTemplates") {
+  from("src/jvmMain/resources-templates")
+  into("$buildDir/generated/resources-templates")
+  expand("projectVersion" to "${project.version}")
+  filteringCharset = Charsets.UTF_8.toString()
 }
 
 kotlin {
@@ -17,6 +23,7 @@ kotlin {
 
   sourceSets {
     commonMain {
+      resources.srcDir(copyResourcesTemplates.get().outputs)
       dependencies {
         api(libs.kotlin.stdlib)
       }
@@ -30,8 +37,6 @@ kotlin {
     }
 
     val jvmMain by getting {
-      kotlin.srcDir("$buildDir/generated/resources-templates")
-
       dependencies {
         api(libs.kotlin.stdlib)
         api(projects.okhttp)
@@ -108,16 +113,5 @@ tasks.getByName("copyJvmJar").dependsOn(tasks.getByName("jvmJar"))
 tasks.getByName("nativeImage").dependsOn(copyJvmJar)
 
 mavenPublishing {
-  configure(KotlinJvm(javadocJar = JavadocJar.Dokka("dokkaGfm")))
-}
-
-tasks.register<Copy>("copyResourcesTemplates") {
-  from("src/main/resources-templates")
-  into("$buildDir/generated/resources-templates")
-  expand("projectVersion" to "${project.version}")
-  filteringCharset = Charsets.UTF_8.toString()
-}.let {
-  tasks.processResources.dependsOn(it)
-  tasks.compileJava.dependsOn(it)
-  tasks["javaSourcesJar"].dependsOn(it)
+  configure(KotlinMultiplatform(javadocJar = JavadocJar.Empty()))
 }

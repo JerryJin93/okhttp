@@ -20,13 +20,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Configure JDK
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Upload Artifacts
         uses: gradle/gradle-build-action@v2
@@ -41,8 +47,12 @@ jobs:
     name: "Validation"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: gradle/wrapper-validation-action@v1
+      - name: Validate Renovate
+        uses: rinchsan/renovate-config-validator@v0.0.12
+        with:
+          pattern: '.github/renovate.json'
 
   checkjdk11:
     permissions:
@@ -51,7 +61,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -61,16 +71,16 @@ jobs:
           distribution: 'zulu'
           java-version: 11
 
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
         with:
-          arguments: check -x test -x jvmTest
-
-      - name: Publish Test Report
-        if: github.repository == 'square/okhttp' && github.ref == 'refs/heads/master'
-        uses: mikepenz/action-junit-report@v3
-        with:
-          report_paths: '**/build/test-results/*/TEST-*.xml'
+          arguments: check -PandroidBuild=true -PgraalBuild=true -x test -x jvmTest -x jsTest
 
   testopenjdk11:
     permissions:
@@ -79,7 +89,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -88,6 +98,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -99,6 +115,7 @@ jobs:
         uses: mikepenz/action-junit-report@v3
         with:
           report_paths: '**/build/test-results/*/TEST-*.xml'
+          check_name: OpenJDK 11 Test Report
 
   testjs:
     permissions:
@@ -107,7 +124,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -116,6 +133,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -127,6 +150,7 @@ jobs:
         uses: mikepenz/action-junit-report@v3
         with:
           report_paths: '**/build/test-results/test/TEST-*.xml'
+          check_name: JS Test Report
 
   testzulu11:
     runs-on: ubuntu-latest
@@ -134,7 +158,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -143,6 +167,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -151,11 +181,11 @@ jobs:
 
   testopenjdk8:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdk8')
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdkversions') || contains(github.event.pull_request.labels.*.name, 'renovate')
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -165,6 +195,12 @@ jobs:
           distribution: 'zulu'
           java-version: 11
 
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
         with:
@@ -172,11 +208,11 @@ jobs:
 
   testopenjdk8alpn:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdk8')
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdkversions')
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -192,6 +228,12 @@ jobs:
           distribution: 'zulu'
           java-version: 11
 
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
         with:
@@ -203,7 +245,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -212,6 +254,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -220,11 +268,11 @@ jobs:
 
   testconscrypt:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'providers')
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'conscrypt')
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -233,6 +281,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -245,7 +299,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -254,6 +308,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -267,7 +327,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -276,6 +336,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
@@ -284,11 +350,12 @@ jobs:
 
   testopenjdk17:
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdk17')
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdkversions') || contains(github.event.pull_request.labels.*.name, 'renovate')
+
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -298,10 +365,50 @@ jobs:
           distribution: 'zulu'
           java-version: 11
 
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Run Checks
         uses: gradle/gradle-build-action@v2
         with:
           arguments: jvmTest -Dtest.java.version=17
+
+  testopenjdk19:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'jdkversions') || contains(github.event.pull_request.labels.*.name, 'renovate')
+
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 19
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Run Checks
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: jvmTest -Dtest.java.version=19
 
   testwindows:
     runs-on: windows-latest
@@ -310,7 +417,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -319,6 +426,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Test
         uses: gradle/gradle-build-action@v2
@@ -332,7 +445,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -342,17 +455,19 @@ jobs:
           distribution: 'zulu'
           java-version: 11
 
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Build okcurl
         uses: gradle/gradle-build-action@v2
-        env:
-          USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM: false
         with:
           arguments: okcurl:nativeImage
 
       - name: Build ConsoleLauncher
         uses: gradle/gradle-build-action@v2
-        env:
-          USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM: false
         with:
           arguments: -PgraalBuild=true native-image-tests:nativeImage
 
@@ -362,7 +477,7 @@ jobs:
   testandroid:
     runs-on: macos-latest
     timeout-minutes: 30
-    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'android')
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'android') || contains(github.event.pull_request.labels.*.name, 'renovate')
 
     strategy:
       fail-fast: false
@@ -373,7 +488,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -383,8 +498,16 @@ jobs:
           distribution: 'zulu'
           java-version: 11
 
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Gradle cache
         uses: gradle/gradle-build-action@v2
+        with:
+          arguments: -PandroidBuild=true :okhttp-android:test
 
       - name: AVD cache
         uses: actions/cache@v3
@@ -413,6 +536,39 @@ jobs:
         env:
           API_LEVEL: ${{ matrix.api-level }}
 
+  testloom:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/master' || contains(github.event.pull_request.labels.*.name, 'loom')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 20
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
+      - name: Run Checks
+        uses: gradle/gradle-build-action@v2
+        with:
+          arguments: jvmTest -Dokhttp.platform=loom -Dtest.java.version=20
+
 
   testandroidregression:
     runs-on: macos-latest
@@ -427,7 +583,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -436,6 +592,12 @@ jobs:
         with:
           distribution: 'zulu'
           java-version: 11
+
+      - name: Configure JDK
+        uses: actions/setup-java@v3
+        with:
+          distribution: 'zulu'
+          java-version: 17
 
       - name: Gradle cache
         uses: gradle/gradle-build-action@v2

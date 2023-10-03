@@ -1,12 +1,37 @@
+import com.android.build.gradle.internal.tasks.factory.dependsOn
+import com.android.build.gradle.tasks.JavaDocJarTask
 import com.vanniktech.maven.publish.JavadocJar
 import com.vanniktech.maven.publish.KotlinMultiplatform
+import org.jetbrains.dokka.gradle.DokkaTask
+import org.jetbrains.dokka.gradle.DokkaTaskPartial
 import org.jetbrains.kotlin.gradle.dsl.KotlinCompile
 
 plugins {
   kotlin("multiplatform")
+  kotlin("plugin.serialization")
   id("org.jetbrains.dokka")
   id("com.vanniktech.maven.publish.base")
   id("binary-compatibility-validator")
+}
+
+// Build & use okhttp3/internal/-InternalVersion.kt
+val copyKotlinTemplates = tasks.register<Copy>("copyKotlinTemplates") {
+  from("src/commonMain/kotlinTemplates")
+  into("$buildDir/generated/sources/kotlinTemplates")
+  expand("projectVersion" to project.version)
+  filteringCharset = Charsets.UTF_8.toString()
+}
+
+// Build & use okhttp3/internal/idn/IdnaMappingTableInstance.kt
+val generateIdnaMappingTableConfiguration: Configuration by configurations.creating
+dependencies {
+  generateIdnaMappingTableConfiguration(projects.okhttpIdnaMappingTable)
+}
+val generateIdnaMappingTable by tasks.creating(JavaExec::class.java) {
+  outputs.dir("$buildDir/generated/sources/idnaMappingTable")
+  mainClass.set("okhttp3.internal.idn.GenerateIdnaMappingTableCode")
+  args("$buildDir/generated/sources/idnaMappingTable")
+  classpath = generateIdnaMappingTableConfiguration
 }
 
 kotlin {
@@ -29,29 +54,32 @@ kotlin {
           }
         }
       }
-      browser {
-      }
     }
   }
 
   sourceSets {
     commonMain {
-      kotlin.srcDir("$buildDir/generated/sources/kotlinTemplates")
+      kotlin.srcDir(copyKotlinTemplates.get().outputs)
+      kotlin.srcDir(generateIdnaMappingTable.outputs)
       dependencies {
         api(libs.squareup.okio)
       }
     }
     val commonTest by getting {
       dependencies {
-        implementation(libs.kotlin.test.common)
+        implementation(projects.okhttpTestingSupport)
+        implementation(libs.assertk)
         implementation(libs.kotlin.test.annotations)
-        api(libs.assertk)
+        implementation(libs.kotlin.test.common)
+        implementation(libs.kotlinx.serialization.core)
+        implementation(libs.kotlinx.serialization.json)
       }
     }
     val nonJvmMain = create("nonJvmMain") {
       dependencies {
         dependsOn(sourceSets.commonMain.get())
         implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.squareup.okhttp.icu)
       }
     }
     val nonJvmTest = create("nonJvmTest") {
@@ -81,7 +109,6 @@ kotlin {
     getByName("jvmTest") {
       dependencies {
         dependsOn(commonTest)
-        implementation(projects.okhttpTestingSupport)
         implementation(projects.okhttpTls)
         implementation(projects.okhttpUrlconnection)
         implementation(projects.mockwebserver3)
@@ -91,7 +118,12 @@ kotlin {
         implementation(projects.loggingInterceptor)
         implementation(projects.okhttpBrotli)
         implementation(projects.okhttpDnsoverhttps)
+        implementation(projects.okhttpIdnaMappingTable)
         implementation(projects.okhttpSse)
+        implementation(projects.okhttpCoroutines)
+        implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.squareup.moshi)
+        implementation(libs.squareup.moshi.kotlin)
         implementation(libs.squareup.okio.fakefilesystem)
         implementation(libs.conscrypt.openjdk)
         implementation(libs.junit)
@@ -103,21 +135,21 @@ kotlin {
         implementation(libs.aqute.resolve)
         compileOnly(libs.findbugs.jsr305)
       }
+    }
 
-      getByName("jsMain") {
-        dependencies {
-          dependsOn(nonJvmMain)
-          api(libs.squareup.okio)
-          api(libs.kotlin.stdlib)
-        }
+    getByName("jsMain") {
+      dependencies {
+        dependsOn(nonJvmMain)
+        api(libs.squareup.okio)
+        api(libs.kotlin.stdlib)
       }
+    }
 
-      getByName("jsTest") {
-        dependencies {
-          dependsOn(nonJvmTest)
-          implementation(libs.kotlin.test.js)
-          implementation(libs.kotlinx.coroutines.test)
-        }
+    getByName("jsTest") {
+      dependencies {
+        dependsOn(nonJvmTest)
+        implementation(libs.kotlin.test.js)
+        implementation(libs.kotlinx.coroutines.test)
       }
     }
   }
@@ -185,15 +217,5 @@ dependencies {
 }
 
 mavenPublishing {
-  configure(KotlinMultiplatform(javadocJar = JavadocJar.Dokka("dokkaGfm")))
-}
-
-val copyKotlinTemplates = tasks.register<Copy>("copyKotlinTemplates") {
-  from("src/commonMain/kotlinTemplates")
-  into("$buildDir/generated/sources/kotlinTemplates")
-  expand("projectVersion" to project.version)
-  filteringCharset = Charsets.UTF_8.toString()
-}
-tasks.withType<KotlinCompile<*>> {
-  dependsOn(copyKotlinTemplates)
+  configure(KotlinMultiplatform(javadocJar = JavadocJar.Empty()))
 }

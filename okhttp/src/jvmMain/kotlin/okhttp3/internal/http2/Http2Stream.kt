@@ -23,6 +23,7 @@ import java.util.ArrayDeque
 import okhttp3.Headers
 import okhttp3.internal.EMPTY_HEADERS
 import okhttp3.internal.assertThreadDoesntHoldLock
+import okhttp3.internal.http2.flowcontrol.WindowCounter
 import okhttp3.internal.notifyAll
 import okhttp3.internal.toHeaderList
 import okhttp3.internal.wait
@@ -45,13 +46,8 @@ class Http2Stream internal constructor(
   // Internal state is guarded by this. No long-running or potentially blocking operations are
   // performed while the lock is held.
 
-  /** The total number of bytes consumed by the application. */
-  var readBytesTotal = 0L
-    internal set
-
-  /** The total number of bytes acknowledged by outgoing `WINDOW_UPDATE` frames. */
-  var readBytesAcknowledged = 0L
-    internal set
+  /** The bytes consumed and acknowledged by the stream. */
+  val readBytes: WindowCounter = WindowCounter(id)
 
   /** The total number of bytes produced by the application. */
   var writeBytesTotal = 0L
@@ -268,12 +264,12 @@ class Http2Stream internal constructor(
       if (this.errorCode != null) {
         return false
       }
-      if (source.finished && sink.finished) {
-        return false
-      }
       this.errorCode = errorCode
       this.errorException = errorException
       notifyAll()
+      if (source.finished && sink.finished) {
+        return false
+      }
     }
     connection.removeStream(id)
     return true
@@ -386,15 +382,16 @@ class Http2Stream internal constructor(
             } else if (readBuffer.size > 0L) {
               // Prepare to read bytes. Start by moving them to the caller's buffer.
               readBytesDelivered = readBuffer.read(sink, minOf(byteCount, readBuffer.size))
-              readBytesTotal += readBytesDelivered
+              readBytes.update(total = readBytesDelivered)
 
-              val unacknowledgedBytesRead = readBytesTotal - readBytesAcknowledged
+              val unacknowledgedBytesRead = readBytes.unacknowledged
               if (errorExceptionToDeliver == null &&
-                  unacknowledgedBytesRead >= connection.okHttpSettings.initialWindowSize / 2) {
+                unacknowledgedBytesRead >= connection.okHttpSettings.initialWindowSize / 2
+              ) {
                 // Flow control: notify the peer that we're ready for more data! Only send a
                 // WINDOW_UPDATE if the stream isn't in error.
                 connection.writeWindowUpdateLater(id, unacknowledgedBytesRead)
-                readBytesAcknowledged = readBytesTotal
+                readBytes.update(acknowledged = unacknowledgedBytesRead)
               }
             } else if (!finished && errorExceptionToDeliver == null) {
               // Nothing to do. Wait until that changes then try again.
@@ -407,6 +404,7 @@ class Http2Stream internal constructor(
             }
           }
         }
+        connection.flowControlListener.receivingStreamWindowChanged(id, readBytes, readBuffer.size)
 
         // 2. Do it outside of the synchronized block and timeout.
 
@@ -415,8 +413,6 @@ class Http2Stream internal constructor(
         }
 
         if (readBytesDelivered != -1L) {
-          // Update connection.unacknowledgedBytesRead outside the synchronized block.
-          updateConnectionFlowControl(readBytesDelivered)
           return readBytesDelivered
         }
 
@@ -446,41 +442,39 @@ class Http2Stream internal constructor(
     internal fun receive(source: BufferedSource, byteCount: Long) {
       this@Http2Stream.assertThreadDoesntHoldLock()
 
-      var byteCount = byteCount
+      var remainingByteCount = byteCount
 
-      while (byteCount > 0L) {
+      while (remainingByteCount > 0L) {
         val finished: Boolean
         val flowControlError: Boolean
         synchronized(this@Http2Stream) {
           finished = this.finished
-          flowControlError = byteCount + readBuffer.size > maxByteCount
+          flowControlError = remainingByteCount + readBuffer.size > maxByteCount
         }
 
         // If the peer sends more data than we can handle, discard it and close the connection.
         if (flowControlError) {
-          source.skip(byteCount)
+          source.skip(remainingByteCount)
           closeLater(ErrorCode.FLOW_CONTROL_ERROR)
           return
         }
 
         // Discard data received after the stream is finished. It's probably a benign race.
         if (finished) {
-          source.skip(byteCount)
+          source.skip(remainingByteCount)
           return
         }
 
         // Fill the receive buffer without holding any locks.
-        val read = source.read(receiveBuffer, byteCount)
+        val read = source.read(receiveBuffer, remainingByteCount)
         if (read == -1L) throw EOFException()
-        byteCount -= read
+        remainingByteCount -= read
 
         // Move the received data to the read buffer to the reader can read it. If this source has
         // been closed since this read began we must discard the incoming data and tell the
         // connection we've done so.
-        var bytesDiscarded = 0L
         synchronized(this@Http2Stream) {
           if (closed) {
-            bytesDiscarded = receiveBuffer.size
             receiveBuffer.clear()
           } else {
             val wasEmpty = readBuffer.size == 0L
@@ -490,10 +484,16 @@ class Http2Stream internal constructor(
             }
           }
         }
-        if (bytesDiscarded > 0L) {
-          updateConnectionFlowControl(bytesDiscarded)
-        }
       }
+
+      // Update the connection flow control, as this is a shared resource.
+      // Even if our stream doesn't need more data, others might.
+      // But delay updating the stream flow control until that stream has been
+      // consumed
+      updateConnectionFlowControl(byteCount)
+
+      // Notify that buffer size changed
+      connection.flowControlListener.receivingStreamWindowChanged(id, readBytes, readBuffer.size)
     }
 
     override fun timeout(): Timeout = readTimeout

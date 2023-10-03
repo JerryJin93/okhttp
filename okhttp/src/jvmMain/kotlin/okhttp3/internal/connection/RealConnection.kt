@@ -27,6 +27,7 @@ import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.SSLSocket
 import okhttp3.Address
 import okhttp3.Connection
+import okhttp3.ConnectionListener
 import okhttp3.Handshake
 import okhttp3.HttpUrl
 import okhttp3.OkHttpClient
@@ -41,6 +42,7 @@ import okhttp3.internal.http.RealInterceptorChain
 import okhttp3.internal.http1.Http1ExchangeCodec
 import okhttp3.internal.http2.ConnectionShutdownException
 import okhttp3.internal.http2.ErrorCode
+import okhttp3.internal.http2.FlowControlListener
 import okhttp3.internal.http2.Http2Connection
 import okhttp3.internal.http2.Http2ExchangeCodec
 import okhttp3.internal.http2.Http2Stream
@@ -76,6 +78,7 @@ class RealConnection(
   private var source: BufferedSource?,
   private var sink: BufferedSink?,
   private val pingIntervalMillis: Int,
+  internal val connectionListener: ConnectionListener
 ) : Http2Connection.Listener(), Connection, ExchangeCodec.Carrier {
   private var http2Connection: Http2Connection? = null
 
@@ -126,8 +129,11 @@ class RealConnection(
     get() = http2Connection != null
 
   /** Prevent further exchanges from being created on this connection. */
-  @Synchronized override fun noNewExchanges() {
-    noNewExchanges = true
+  override fun noNewExchanges() {
+    synchronized(this) {
+      noNewExchanges = true
+    }
+    connectionListener.noNewExchanges(this)
   }
 
   /** Prevent this connection from being used for hosts other than the one in [route]. */
@@ -153,10 +159,12 @@ class RealConnection(
     val source = this.source!!
     val sink = this.sink!!
     socket.soTimeout = 0 // HTTP/2 connection timeouts are set per-stream.
+    val flowControlListener = connectionListener as? FlowControlListener ?: FlowControlListener.None
     val http2Connection = Http2Connection.Builder(client = true, taskRunner)
       .socket(socket, route.address.url.host, source, sink)
       .listener(this)
       .pingIntervalMillis(pingIntervalMillis)
+      .flowControlListener(flowControlListener)
       .build()
     this.http2Connection = http2Connection
     this.allocationLimit = Http2Connection.DEFAULT_SETTINGS.getMaxConcurrentStreams()
@@ -342,38 +350,50 @@ class RealConnection(
    * Track a failure using this connection. This may prevent both the connection and its route from
    * being used for future exchanges.
    */
-  @Synchronized override fun trackFailure(call: RealCall, e: IOException?) {
-    if (e is StreamResetException) {
-      when {
-        e.errorCode == ErrorCode.REFUSED_STREAM -> {
-          // Stop using this connection on the 2nd REFUSED_STREAM error.
-          refusedStreamCount++
-          if (refusedStreamCount > 1) {
+  override fun trackFailure(call: RealCall, e: IOException?) {
+    var noNewExchangesEvent = false
+    synchronized(this) {
+      if (e is StreamResetException) {
+        when {
+          e.errorCode == ErrorCode.REFUSED_STREAM -> {
+            // Stop using this connection on the 2nd REFUSED_STREAM error.
+            refusedStreamCount++
+            if (refusedStreamCount > 1) {
+              noNewExchangesEvent = !noNewExchanges
+              noNewExchanges = true
+              routeFailureCount++
+            }
+          }
+
+          e.errorCode == ErrorCode.CANCEL && call.isCanceled() -> {
+            // Permit any number of CANCEL errors on locally-canceled calls.
+          }
+
+          else -> {
+            // Everything else wants a fresh connection.
+            noNewExchangesEvent = !noNewExchanges
             noNewExchanges = true
             routeFailureCount++
           }
         }
+      } else if (!isMultiplexed || e is ConnectionShutdownException) {
+        noNewExchangesEvent = !noNewExchanges
+        noNewExchanges = true
 
-        e.errorCode == ErrorCode.CANCEL && call.isCanceled() -> {
-          // Permit any number of CANCEL errors on locally-canceled calls.
-        }
-
-        else -> {
-          // Everything else wants a fresh connection.
-          noNewExchanges = true
+        // If this route hasn't completed a call, avoid it for new connections.
+        if (successCount == 0) {
+          if (e != null) {
+            connectFailed(call.client, route, e)
+          }
           routeFailureCount++
         }
       }
-    } else if (!isMultiplexed || e is ConnectionShutdownException) {
-      noNewExchanges = true
 
-      // If this route hasn't completed a call, avoid it for new connections.
-      if (successCount == 0) {
-        if (e != null) {
-          connectFailed(call.client, route, e)
-        }
-        routeFailureCount++
-      }
+      Unit
+    }
+
+    if (noNewExchangesEvent) {
+      connectionListener.noNewExchanges(this)
     }
   }
 
@@ -408,6 +428,7 @@ class RealConnection(
         source = null,
         sink = null,
         pingIntervalMillis = 0,
+        ConnectionListener.NONE
       )
       result.idleAtNs = idleAtNs
       return result
