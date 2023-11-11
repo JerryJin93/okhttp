@@ -1,8 +1,8 @@
 [versions]
 biz-aQute-bnd = "6.4.0"
-checkStyle = "10.12.3"
+checkStyle = "10.12.4"
 com-squareup-moshi = "1.15.0"
-com-squareup-okio = "3.5.0"
+com-squareup-okio = "3.6.0"
 de-mannodermaus-junit5 = "1.3.0"
 graalvm = "22.3.2"
 kotlinx-serialization = "1.6.0"
@@ -10,10 +10,10 @@ org-bouncycastle = "1.76"
 org-conscrypt = "2.5.2"
 org-jetbrains-coroutines = "1.7.3"
 org-jetbrains-kotlin = "1.9.0"
-org-junit-jupiter = "5.10.0"
+org-junit-jupiter = "5.10.1"
 
 [libraries]
-amazonCorretto = "software.amazon.cryptools:AmazonCorrettoCryptoProvider:2.1.0"
+amazonCorretto = "software.amazon.cryptools:AmazonCorrettoCryptoProvider:2.3.1"
 androidx-annotation = "androidx.annotation:annotation:1.7.0"
 androidx-espresso-core = "androidx.test.espresso:espresso-core:3.5.1"
 androidx-junit = "androidx.test.ext:junit:1.1.5"
@@ -27,7 +27,7 @@ bouncycastle-bcprov = { module = "org.bouncycastle:bcprov-jdk15to18", version.re
 bouncycastle-bctls = { module = "org.bouncycastle:bctls-jdk15to18", version.ref = "org-bouncycastle" }
 brotli-dec = "org.brotli:dec:0.1.2"
 checkStyle = { module = "com.puppycrawl.tools:checkstyle", version.ref = "checkStyle" }
-clikt = "com.github.ajalt.clikt:clikt:4.2.0"
+clikt = "com.github.ajalt.clikt:clikt:4.2.1"
 codehaus-signature-java18 = "org.codehaus.mojo.signature:java18:1.0"
 conscrypt-android = { module = "org.conscrypt:conscrypt-android", version.ref = "org-conscrypt" }
 conscrypt-openjdk = { module = "org.conscrypt:conscrypt-openjdk-uber", version.ref = "org-conscrypt" }
@@ -44,21 +44,21 @@ gradlePlugin-graal = "com.palantir.graal:gradle-graal:0.12.0"
 gradlePlugin-kotlin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "org-jetbrains-kotlin" }
 gradlePlugin-kotlinSerialization = { module = "org.jetbrains.kotlin:kotlin-serialization", version.ref = "org-jetbrains-kotlin" }
 gradlePlugin-mavenPublish = "com.vanniktech:gradle-maven-publish-plugin:0.25.3"
-gradlePlugin-shadow = "gradle.plugin.com.github.johnrengelman:shadow:7.1.2"
+gradlePlugin-shadow = "gradle.plugin.com.github.johnrengelman:shadow:8.0.0"
 gradlePlugin-spotless = "com.diffplug.spotless:spotless-plugin-gradle:6.22.0"
-guava-jre = "com.google.guava:guava:32.1.2-jre"
+guava-jre = "com.google.guava:guava:32.1.3-jre"
 hamcrestLibrary = "org.hamcrest:hamcrest-library:2.2"
 httpClient5 = "org.apache.httpcomponents.client5:httpclient5:5.2.1"
-jettyClient = "org.eclipse.jetty:jetty-client:9.4.52.v20230823"
+jettyClient = "org.eclipse.jetty:jetty-client:9.4.53.v20231009"
 jnr-unixsocket = "com.github.jnr:jnr-unixsocket:0.38.21"
-jsoup = "org.jsoup:jsoup:1.16.1"
+jsoup = "org.jsoup:jsoup:1.16.2"
 junit = "junit:junit:4.13.2"
 junit-ktx = "androidx.test.ext:junit-ktx:1.1.5"
 junit-jupiter-api = { module = "org.junit.jupiter:junit-jupiter-api", version.ref = "org-junit-jupiter" }
 junit-jupiter-engine = { module = "org.junit.jupiter:junit-jupiter-engine", version.ref = "org-junit-jupiter" }
 junit-jupiter-params = { module = "org.junit.jupiter:junit-jupiter-params", version.ref = "org-junit-jupiter" }
-junit-platform-console = "org.junit.platform:junit-platform-console:1.10.0"
-junit-vintage-engine = "org.junit.vintage:junit-vintage-engine:5.10.0"
+junit-platform-console = "org.junit.platform:junit-platform-console:1.10.1"
+junit-vintage-engine = "org.junit.vintage:junit-vintage-engine:5.10.1"
 junit-pioneer = "org.junit-pioneer:junit-pioneer:1.9.1"
 junit5android-core = { module = "de.mannodermaus.junit5:android-test-core", version.ref = "de-mannodermaus-junit5" }
 junit5android-runner = { module = "de.mannodermaus.junit5:android-test-runner", version.ref = "de-mannodermaus-junit5" }
@@ -75,10 +75,10 @@ kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-t
 kotlinx-serialization-core = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinx-serialization" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 nativeImageSvm = { module = "org.graalvm.nativeimage:svm", version.ref = "graalvm" }
-openjsse = "org.openjsse:openjsse:1.1.13"
+openjsse = "org.openjsse:openjsse:1.1.14"
 playservices-safetynet = "com.google.android.gms:play-services-safetynet:18.0.1"
-robolectric-android = "org.robolectric:android-all:13-robolectric-9030017"
-robolectric = "org.robolectric:robolectric:4.10.3"
+robolectric-android = "org.robolectric:android-all:14-robolectric-10818077"
+robolectric = "org.robolectric:robolectric:4.11.1"
 signature-android-apilevel21 = "net.sf.androidscents.signature:android-api-level-21:5.0.1_r2"
 signature-android-apilevel24 = "net.sf.androidscents.signature:android-api-level-24:7.0_r2"
 squareup-moshi = { module = "com.squareup.moshi:moshi", version.ref = "com-squareup-moshi" }
