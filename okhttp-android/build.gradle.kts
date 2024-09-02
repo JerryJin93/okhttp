@@ -12,7 +12,7 @@ plugins {
 }
 
 android {
-  compileSdk = 33
+  compileSdk = 34
 
   namespace = "okhttp.android"
 
@@ -30,6 +30,8 @@ android {
       unitTests {
         isIncludeAndroidResources = true
       }
+
+      targetSdk = 34
     }
   }
 
@@ -46,6 +48,7 @@ android {
 dependencies {
   api(libs.squareup.okio)
   api(projects.okhttp)
+  api(projects.loggingInterceptor)
   compileOnly(libs.androidx.annotation)
   compileOnly(libs.findbugs.jsr305)
   debugImplementation(libs.androidx.annotation)
@@ -55,7 +58,7 @@ dependencies {
 
   testImplementation(libs.junit)
   testImplementation(libs.junit.ktx)
-  testImplementation(libs.assertj.core)
+  testImplementation(libs.assertk)
   testImplementation(projects.okhttpTls)
   testImplementation(libs.androidx.test.runner)
   testImplementation(libs.robolectric)
@@ -63,7 +66,7 @@ dependencies {
   testImplementation(libs.squareup.okio.fakefilesystem)
 
   androidTestImplementation(projects.okhttpTls)
-  androidTestImplementation(libs.assertj.core)
+  androidTestImplementation(libs.assertk)
   androidTestImplementation(projects.mockwebserver3Junit4)
   androidTestImplementation(libs.androidx.test.runner)
 }

@@ -68,7 +68,7 @@ public final class okhttp3/Cache : java/io/Closeable, java/io/Flushable {
 	public static final field Companion Lokhttp3/Cache$Companion;
 	public final fun -deprecated_directory ()Ljava/io/File;
 	public fun <init> (Ljava/io/File;J)V
-	public fun <init> (Lokio/Path;JLokio/FileSystem;)V
+	public fun <init> (Lokio/FileSystem;Lokio/Path;J)V
 	public fun close ()V
 	public final fun delete ()V
 	public final fun directory ()Ljava/io/File;
@@ -130,11 +130,11 @@ public final class okhttp3/CacheControl$Builder {
 	public final fun build ()Lokhttp3/CacheControl;
 	public final fun immutable ()Lokhttp3/CacheControl$Builder;
 	public final fun maxAge (ILjava/util/concurrent/TimeUnit;)Lokhttp3/CacheControl$Builder;
-	public final fun maxAge (ILkotlin/time/DurationUnit;)Lokhttp3/CacheControl$Builder;
+	public final fun maxAge-LRDsOJo (J)Lokhttp3/CacheControl$Builder;
 	public final fun maxStale (ILjava/util/concurrent/TimeUnit;)Lokhttp3/CacheControl$Builder;
-	public final fun maxStale (ILkotlin/time/DurationUnit;)Lokhttp3/CacheControl$Builder;
+	public final fun maxStale-LRDsOJo (J)Lokhttp3/CacheControl$Builder;
 	public final fun minFresh (ILjava/util/concurrent/TimeUnit;)Lokhttp3/CacheControl$Builder;
-	public final fun minFresh (ILkotlin/time/DurationUnit;)Lokhttp3/CacheControl$Builder;
+	public final fun minFresh-LRDsOJo (J)Lokhttp3/CacheControl$Builder;
 	public final fun noCache ()Lokhttp3/CacheControl$Builder;
 	public final fun noStore ()Lokhttp3/CacheControl$Builder;
 	public final fun noTransform ()Lokhttp3/CacheControl$Builder;
@@ -384,6 +384,16 @@ public final class okhttp3/ConnectionPool {
 	public final fun connectionCount ()I
 	public final fun evictAll ()V
 	public final fun idleConnectionCount ()I
+	public final fun setPolicy (Lokhttp3/Address;Lokhttp3/ConnectionPool$AddressPolicy;)V
+}
+
+public final class okhttp3/ConnectionPool$AddressPolicy {
+	public final field backoffDelayMillis J
+	public final field backoffJitterMillis I
+	public final field minimumConcurrentCalls I
+	public fun <init> ()V
+	public fun <init> (IJI)V
+	public synthetic fun <init> (IJIILkotlin/jvm/internal/DefaultConstructorMarker;)V
 }
 
 public final class okhttp3/ConnectionSpec {
@@ -556,6 +566,9 @@ public abstract interface class okhttp3/EventListener$Factory {
 	public abstract fun create (Lokhttp3/Call;)Lokhttp3/EventListener;
 }
 
+public abstract interface annotation class okhttp3/ExperimentalOkHttpApi : java/lang/annotation/Annotation {
+}
+
 public final class okhttp3/FormBody : okhttp3/RequestBody {
 	public static final field Companion Lokhttp3/FormBody$Companion;
 	public final fun -deprecated_size ()I
@@ -674,6 +687,7 @@ public final class okhttp3/HttpUrl {
 	public final fun -deprecated_uri ()Ljava/net/URI;
 	public final fun -deprecated_url ()Ljava/net/URL;
 	public final fun -deprecated_username ()Ljava/lang/String;
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/util/List;Ljava/util/List;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public static final fun defaultPort (Ljava/lang/String;)I
 	public final fun encodedFragment ()Ljava/lang/String;
 	public final fun encodedPassword ()Ljava/lang/String;
@@ -816,6 +830,7 @@ public final class okhttp3/MultipartBody : okhttp3/RequestBody {
 	public final fun boundary ()Ljava/lang/String;
 	public fun contentLength ()J
 	public fun contentType ()Lokhttp3/MediaType;
+	public fun isOneShot ()Z
 	public final fun part (I)Lokhttp3/MultipartBody$Part;
 	public final fun parts ()Ljava/util/List;
 	public final fun size ()I
@@ -908,6 +923,7 @@ public class okhttp3/OkHttpClient : okhttp3/Call$Factory, okhttp3/WebSocket$Fact
 	public final fun -deprecated_sslSocketFactory ()Ljavax/net/ssl/SSLSocketFactory;
 	public final fun -deprecated_writeTimeoutMillis ()I
 	public fun <init> ()V
+	public final fun address (Lokhttp3/HttpUrl;)Lokhttp3/Address;
 	public final fun authenticator ()Lokhttp3/Authenticator;
 	public final fun cache ()Lokhttp3/Cache;
 	public final fun callTimeoutMillis ()I
@@ -939,6 +955,7 @@ public class okhttp3/OkHttpClient : okhttp3/Call$Factory, okhttp3/WebSocket$Fact
 	public final fun retryOnConnectionFailure ()Z
 	public final fun socketFactory ()Ljavax/net/SocketFactory;
 	public final fun sslSocketFactory ()Ljavax/net/ssl/SSLSocketFactory;
+	public final fun webSocketCloseTimeout ()I
 	public final fun writeTimeoutMillis ()I
 	public final fun x509TrustManager ()Ljavax/net/ssl/X509TrustManager;
 }
@@ -987,6 +1004,9 @@ public final class okhttp3/OkHttpClient$Builder {
 	public final fun socketFactory (Ljavax/net/SocketFactory;)Lokhttp3/OkHttpClient$Builder;
 	public final fun sslSocketFactory (Ljavax/net/ssl/SSLSocketFactory;)Lokhttp3/OkHttpClient$Builder;
 	public final fun sslSocketFactory (Ljavax/net/ssl/SSLSocketFactory;Ljavax/net/ssl/X509TrustManager;)Lokhttp3/OkHttpClient$Builder;
+	public final fun webSocketCloseTimeout (JLjava/util/concurrent/TimeUnit;)Lokhttp3/OkHttpClient$Builder;
+	public final fun webSocketCloseTimeout (Ljava/time/Duration;)Lokhttp3/OkHttpClient$Builder;
+	public final fun webSocketCloseTimeout-LRDsOJo (J)Lokhttp3/OkHttpClient$Builder;
 	public final fun writeTimeout (JLjava/util/concurrent/TimeUnit;)Lokhttp3/OkHttpClient$Builder;
 	public final fun writeTimeout (Ljava/time/Duration;)Lokhttp3/OkHttpClient$Builder;
 	public final fun writeTimeout-LRDsOJo (J)Lokhttp3/OkHttpClient$Builder;
@@ -1025,6 +1045,7 @@ public final class okhttp3/Request {
 	public synthetic fun <init> (Lokhttp3/HttpUrl;Lokhttp3/Headers;Ljava/lang/String;Lokhttp3/RequestBody;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun body ()Lokhttp3/RequestBody;
 	public final fun cacheControl ()Lokhttp3/CacheControl;
+	public final fun cacheUrlOverride ()Lokhttp3/HttpUrl;
 	public final fun header (Ljava/lang/String;)Ljava/lang/String;
 	public final fun headers ()Lokhttp3/Headers;
 	public final fun headers (Ljava/lang/String;)Ljava/util/List;
@@ -1043,6 +1064,7 @@ public class okhttp3/Request$Builder {
 	public fun addHeader (Ljava/lang/String;Ljava/lang/String;)Lokhttp3/Request$Builder;
 	public fun build ()Lokhttp3/Request;
 	public fun cacheControl (Lokhttp3/CacheControl;)Lokhttp3/Request$Builder;
+	public final fun cacheUrlOverride (Lokhttp3/HttpUrl;)Lokhttp3/Request$Builder;
 	public final fun delete ()Lokhttp3/Request$Builder;
 	public fun delete (Lokhttp3/RequestBody;)Lokhttp3/Request$Builder;
 	public static synthetic fun delete$default (Lokhttp3/Request$Builder;Lokhttp3/RequestBody;ILjava/lang/Object;)Lokhttp3/Request$Builder;
